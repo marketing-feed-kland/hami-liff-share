@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>好書分享推薦</title>
+  <title>好書推薦分享</title>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     body {
@@ -29,10 +29,11 @@
       border-radius: 16px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.06);
       width: 100%;
-      max-width: 360px;
+      max-width: 380px;
       display: flex;
       flex-direction: column;
       align-items: center;
+      box-sizing: border-box;
     }
     .icon {
       font-size: 44px;
@@ -49,6 +50,24 @@
       color: #666;
       line-height: 1.5;
       margin-bottom: 20px;
+    }
+    .book-preview-list {
+      width: 100%;
+      text-align: left;
+      margin-bottom: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px;
+      box-sizing: border-box;
+      display: none;
+    }
+    .book-preview-item {
+      font-size: 13px;
+      color: #444;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .btn-share {
       display: none;
@@ -100,24 +119,30 @@
   <div class="card-box">
     <div class="spinner" id="spinner"></div>
     <div class="icon" id="headerIcon" style="display: none;">📚</div>
-    <div class="title" id="mainTitle">準備專屬書單中</div>
-    <div class="status" id="statusText">正在驗證授權環境...</div>
+    <div class="title" id="mainTitle">連線準備中</div>
+    <div class="status" id="statusText">正在驗證 LINE 授權...</div>
+
+    <!-- 即時預覽抓取到的書籍清單 -->
+    <div class="book-preview-list" id="bookPreviewList"></div>
     
-    <!-- 核心：由使用者主動點擊按鈕，避開 EXCEPTION_IN_SUBWINDOW -->
-    <button class="btn-share" id="shareBtn" onclick="handleShareClick()">選擇好友／群組發送</button>
+    <!-- 使用者點擊以發送卡片 -->
+    <button class="btn-share" id="shareBtn" onclick="handleShareClick()">選擇好友／群組發送書單</button>
     <div class="err-log" id="errLog"></div>
   </div>
 
   <script>
     const MY_LIFF_ID = "2012185997-sJenhi1M";
+    // ⚠️ 請填入你 GAS 部署為 Web 應用程式的完整 URL
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec";
+
     let cachedFlexMessage = null;
 
     function showDebugError(msg) {
       document.getElementById("spinner").style.display = "none";
       document.getElementById("headerIcon").style.display = "block";
       document.getElementById("headerIcon").innerText = "⚠️";
-      document.getElementById("mainTitle").innerText = "設定或環境提醒";
-      document.getElementById("statusText").innerText = "無法開啟分享功能";
+      document.getElementById("mainTitle").innerText = "載入失敗";
+      document.getElementById("statusText").innerText = "無法取得促銷書單";
       const errEl = document.getElementById("errLog");
       errEl.style.display = "block";
       errEl.innerText = msg;
@@ -132,44 +157,53 @@
       try {
         await liff.init({ liffId: MY_LIFF_ID });
 
-        // 登入驗證
         if (!liff.isLoggedIn()) {
           updateStatus("驗證身分", "正在跳轉至授權畫面...");
           liff.login({ redirectUri: window.location.href });
           return;
         }
 
-        // 檢查環境支援度
-        if (!liff.isApiAvailable("shareTargetPicker")) {
-          showDebugError("您的環境不支援 shareTargetPicker，請確認後台 Share Target Picker 為 ON，且在手機版 LINE App 中打開！");
+        if (!liff.isInClient()) {
+          showDebugError("請在手機 LINE 內點擊專屬連結開啟！外部瀏覽器不支援發送好友卡片。");
           return;
         }
 
-        // 解析推廣參數並預先組裝好卡片
         const urlParams = new URLSearchParams(window.location.search);
         const category = urlParams.get("cat") || "熱門特惠";
         const salesCode = urlParams.get("code") || "PROMO";
 
-        cachedFlexMessage = buildStandardFlexCarousel(category, salesCode);
+        updateStatus("載入書單", `正在準備【${category}】精選好書卡片...`);
 
-        // 隱藏 Spinner，顯示分享按鈕
+        // 向 GAS 05.api.gs 取得後端已完全組好的 Bubbles 陣列
+        const fetchUrl = `${GAS_API_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(salesCode)}`;
+        const response = await fetch(fetchUrl);
+        const resJson = await response.json();
+
+        if (resJson.status !== "success" || !resJson.data || resJson.data.length === 0) {
+          throw new Error("目前此分類沒有可推薦的書籍資料。");
+        }
+
+        // 直接使用後端回傳的完整 Bubbles 陣列組成 Carousel
+        cachedFlexMessage = {
+          type: "flex",
+          altText: `📚 好友為您推薦【${category}】特價好書！`,
+          contents: {
+            type: "carousel",
+            contents: resJson.data // 👈 完全使用後端資料，與分享者看到的卡片一致
+          }
+        };
+
+        // 更新介面
         document.getElementById("spinner").style.display = "none";
         document.getElementById("headerIcon").style.display = "block";
-        updateStatus("【" + category + "】限時書單", "點擊下方按鈕即可選擇好友或 LINE 群組發送推薦卡片！");
+        updateStatus(`【${category}】精選好書`, `好書卡片已準備就緒，點擊下方按鈕即可選擇好友或群組分享！`);
         document.getElementById("shareBtn").style.display = "block";
 
       } catch (err) {
-        let detail = "";
-        try {
-          detail = JSON.stringify(err, Object.getOwnPropertyNames(err));
-        } catch (e) {
-          detail = err.message || err.toString();
-        }
-        showDebugError("錯誤詳情：" + (err.message || detail));
+        showDebugError("錯誤詳情：" + (err.message || JSON.stringify(err)));
       }
     }
 
-    // 由使用者的 Click 事件觸發，確保符合瀏覽器與原生安全規範
     async function handleShareClick() {
       if (!cachedFlexMessage) return;
 
@@ -180,14 +214,13 @@
       try {
         const res = await liff.shareTargetPicker([cachedFlexMessage]);
         if (res) {
-          updateStatus("發送成功！", "好書推薦卡片已成功送出！視窗即將關閉...");
+          updateStatus("發送成功！", "特惠書單已成功分享給好友！視窗即將關閉...");
           btn.style.display = "none";
           setTimeout(() => liff.closeWindow(), 1200);
         } else {
-          // 使用者在好友選擇器中點了取消
           btn.disabled = false;
-          btn.innerText = "選擇好友／群組發送";
-          updateStatus("未發送", "您已取消選擇，隨時可再次點擊按鈕分享。");
+          btn.innerText = "選擇好友／群組發送書單";
+          updateStatus("未發送", "您已取消選擇，隨時可再次點擊分享。");
         }
       } catch (error) {
         btn.disabled = false;
@@ -196,158 +229,156 @@
       }
     }
 
-    // ── 組裝標準輪播卡片 ──
-    function buildStandardFlexCarousel(category, salesCode) {
-      const safeCat = category || "熱門特惠";
+    // ── 組裝真實多書籍輪播卡片 ──
+    function buildDynamicFlexCarousel(books, category, salesCode) {
       const code = salesCode || "PROMO";
-      const promoUrl = "https://hamibook.tw/sale/" + encodeURIComponent(code);
+      const safeCat = category || "熱門特惠";
+      const nextShareUrl = `https://liff.line.me/${MY_LIFF_ID}?cat=${encodeURIComponent(safeCat)}&code=${encodeURIComponent(code)}`;
+
+      const bubbles = books.map(book => {
+        // 單書立即入手導購連結（附帶推廣碼）
+        const rawLink = book.link || "https://www.hamibook.com.tw";
+        const buyUrl = rawLink.includes("?") 
+          ? `${rawLink}&sales_code=${code}` 
+          : `${rawLink}?sales_code=${code}`;
+
+        return {
+          type: "bubble",
+          size: "kilo",
+          hero: {
+            type: "image",
+            url: book.image_link || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=60",
+            size: "full",
+            aspectRatio: "20:13",
+            aspectMode: "cover"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            spacing: "sm",
+            paddingAll: "14px",
+            contents: [
+              {
+                type: "text",
+                text: book.title || "特惠好書",
+                weight: "bold",
+                size: "sm",
+                wrap: true,
+                maxLines: 2
+              },
+              {
+                type: "box",
+                layout: "horizontal",
+                spacing: "xs",
+                margin: "xs",
+                contents: [
+                  { type: "text", text: "💡", size: "xxs", flex: 0 },
+                  {
+                    type: "text",
+                    text: book.ai_recommend || book.description || "限時特惠不容錯過的推薦好書！",
+                    size: "xxs",
+                    color: "#2e7d32",
+                    wrap: true,
+                    maxLines: 2
+                  }
+                ]
+              },
+              {
+                type: "box",
+                layout: "baseline",
+                spacing: "sm",
+                margin: "sm",
+                contents: [
+                  {
+                    type: "text",
+                    text: `NT$ ${book.sale_price || 99}`,
+                    size: "md",
+                    color: "#ff334b",
+                    weight: "bold",
+                    flex: 0
+                  },
+                  {
+                    type: "text",
+                    text: `NT$ ${book.price || 300}`,
+                    size: "xxs",
+                    color: "#aaaaaa",
+                    decoration: "line-through",
+                    flex: 0
+                  },
+                  {
+                    type: "text",
+                    text: "即將截止",
+                    size: "xxs",
+                    color: "#ff8800",
+                    align: "end"
+                  }
+                ]
+              }
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            paddingAll: "10px",
+            contents: [
+              {
+                type: "button",
+                style: "primary",
+                color: "#4A90E2",
+                height: "sm",
+                action: {
+                  type: "uri",
+                  label: "立即入手",
+                  uri: buyUrl
+                }
+              }
+            ]
+          }
+        };
+      });
+
+      // 末卡：二次裂變卡片
+      bubbles.push({
+        type: "bubble",
+        size: "kilo",
+        body: {
+          type: "box",
+          layout: "vertical",
+          justifyContent: "center",
+          alignItems: "center",
+          spacing: "md",
+          paddingAll: "16px",
+          contents: [
+            { type: "text", text: "🎁 好康相報", weight: "bold", size: "lg" },
+            {
+              type: "text",
+              text: `推薦碼：${code}\n這份【${safeCat}】書單超划算，一鍵分享給喜愛閱讀的好友！`,
+              size: "xs",
+              color: "#666666",
+              align: "center",
+              wrap: true
+            },
+            {
+              type: "button",
+              style: "primary",
+              color: "#06C755",
+              height: "sm",
+              action: {
+                type: "uri",
+                label: "轉發好書給好友",
+                uri: nextShareUrl // 👈 關鍵：朋友點擊後會開啟 LIFF，再度彈出分享器！
+              }
+            }
+          ]
+        }
+      });
 
       return {
         type: "flex",
         altText: `📚 好友為您推薦【${safeCat}】即將截止特價好書！`,
         contents: {
           type: "carousel",
-          contents: [
-            // 卡片 1：精選書籍卡片
-            {
-              type: "bubble",
-              size: "mega",
-              hero: {
-                type: "image",
-                url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=60",
-                size: "full",
-                aspectRatio: "20:13",
-                aspectMode: "cover"
-              },
-              body: {
-                type: "box",
-                layout: "vertical",
-                spacing: "sm",
-                paddingAll: "16px",
-                contents: [
-                  {
-                    type: "text",
-                    text: `【${safeCat}】限時精選好書`,
-                    weight: "bold",
-                    size: "md",
-                    wrap: true
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    spacing: "xs",
-                    margin: "xs",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "💡",
-                        size: "xs",
-                        flex: 0
-                      },
-                      {
-                        type: "text",
-                        text: "直擊痛點精選，限時特惠不容錯過的深度好書！",
-                        size: "xs",
-                        color: "#2e7d32",
-                        wrap: true
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "baseline",
-                    spacing: "sm",
-                    margin: "md",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "NT$ 99 起",
-                        size: "lg",
-                        color: "#ff334b",
-                        weight: "bold",
-                        flex: 0
-                      },
-                      {
-                        type: "text",
-                        text: "NT$ 320",
-                        size: "xs",
-                        color: "#aaaaaa",
-                        decoration: "line-through",
-                        flex: 0
-                      },
-                      {
-                        type: "text",
-                        text: "即將截止",
-                        size: "xxs",
-                        color: "#ff8800",
-                        align: "end"
-                      }
-                    ]
-                  }
-                ]
-              },
-              footer: {
-                type: "box",
-                layout: "vertical",
-                spacing: "xs",
-                paddingAll: "12px",
-                contents: [
-                  {
-                    type: "button",
-                    style: "primary",
-                    color: "#4A90E2",
-                    height: "sm",
-                    action: {
-                      type: "uri",
-                      label: "立即查看促銷書單",
-                      uri: promoUrl
-                    }
-                  }
-                ]
-              }
-            },
-            // 卡片 2：推廣導流末卡
-            {
-              type: "bubble",
-              size: "mega",
-              body: {
-                type: "box",
-                layout: "vertical",
-                justifyContent: "center",
-                alignItems: "center",
-                spacing: "md",
-                paddingAll: "20px",
-                contents: [
-                  {
-                    type: "text",
-                    text: "🎁 好康相報",
-                    weight: "bold",
-                    size: "xl"
-                  },
-                  {
-                    type: "text",
-                    text: `推薦碼：${code}\n快把這份特價書單分享給愛閱讀的朋友！`,
-                    size: "xs",
-                    color: "#666666",
-                    align: "center",
-                    wrap: true
-                  },
-                  {
-                    type: "button",
-                    style: "primary",
-                    color: "#06C755",
-                    margin: "md",
-                    height: "sm",
-                    action: {
-                      type: "uri",
-                      label: "前往全站促銷會場",
-                      uri: promoUrl
-                    }
-                  }
-                ]
-              }
-            }
-          ]
+          contents: bubbles
         }
       };
     }
