@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>正在為您開啟好書分享...</title>
+  <title>正在開啟好書分享...</title>
   <!-- 引入 LINE 官方 LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
@@ -13,96 +13,125 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
       background-color: #f7f9fa;
       color: #333;
+      padding: 20px;
+      box-sizing: border-box;
+      text-align: center;
     }
     .spinner {
-      width: 40px;
-      height: 40px;
+      width: 44px;
+      height: 44px;
       border: 4px solid #e3e3e3;
       border-top: 4px solid #06C755;
       border-radius: 50%;
       animation: spin 1s linear infinite;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    .tip {
-      font-size: 14px;
-      color: #666;
+    .status {
+      font-size: 15px;
+      color: #444;
+      line-height: 1.6;
+    }
+    .err-log {
+      margin-top: 20px;
+      padding: 12px;
+      background: #ffebee;
+      color: #c62828;
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: left;
+      word-break: break-all;
+      display: none;
+      width: 100%;
+      max-width: 360px;
     }
   </style>
 </head>
 <body>
-  <div class="spinner"></div>
-  <div class="tip" id="statusText">正在準備專屬推薦卡片，請稍候...</div>
+  <div class="spinner" id="spinner"></div>
+  <div class="status" id="statusText">正在準備專屬推薦卡片，請稍候...</div>
+  <div class="err-log" id="errLog"></div>
 
   <script>
-    // ── 請填入你在 LINE Developers 建立的 LIFF ID ──
+    // ⚠️ 務必填入你在 LINE Login Channel 拿到的真實 LIFF ID（例如：2007xxxxxx-Abcd1234）
     const MY_LIFF_ID = "2012185997-sJenhi1M";
 
+    function showDebugError(msg) {
+      document.getElementById("spinner").style.display = "none";
+      document.getElementById("statusText").innerText = "❌ 啟動分享失敗";
+      const errEl = document.getElementById("errLog");
+      errEl.style.display = "block";
+      errEl.innerText = msg;
+    }
+
+    function updateStatus(text) {
+      document.getElementById("statusText").innerText = text;
+    }
+
     async function main() {
-      const statusEl = document.getElementById("statusText");
+      // 1. 檢查 LIFF ID 是否有填入
+      if (!MY_LIFF_ID || MY_LIFF_ID.includes("YOUR_LIFF_ID")) {
+        showDebugError("錯誤：未填入正確的 MY_LIFF_ID，請至 GitHub index.html 設定真實 LIFF ID！");
+        return;
+      }
 
       try {
-        // 1. 初始化 LIFF
+        updateStatus("正在連線 LINE 服務 (init)...");
         await liff.init({ liffId: MY_LIFF_ID });
 
-        // 2. 若未登入 LINE，強制引導登入
+        // 2. 登入檢查
         if (!liff.isLoggedIn()) {
+          updateStatus("引導授權登入中...");
           liff.login();
           return;
         }
 
-        // 3. 檢查環境是否支援 shareTargetPicker
+        // 3. 檢查 API 是否可用
         if (!liff.isApiAvailable("shareTargetPicker")) {
-          alert("很抱歉，您的 LINE 版本不支援直接分享卡片功能。");
-          liff.closeWindow();
+          showDebugError("您的環境不支援 shareTargetPicker，請確認後台開關為 ON 且由手機 LINE 內部開啟！");
           return;
         }
 
-        // 4. 解析網址傳入的參數
+        updateStatus("解析推廣參數中...");
         const urlParams = new URLSearchParams(window.location.search);
         const category = urlParams.get("cat") || "熱門特惠";
-        const salesCode = urlParams.get("code") || "DEFAULT";
+        const salesCode = urlParams.get("code") || "PROMO";
 
-        // 5. 提示使用者
-        statusEl.innerText = `正在喚起好友選擇器（分類：${category}）...`;
+        updateStatus("正在喚起 LINE 好友選擇器...");
+        const flexMessage = buildSafeFlexCard(category, salesCode);
 
-        // 6. 組裝預備發送的 Flex 輪播卡片 (帶上該推廣碼與二次分享連結)
-        const flexMessage = buildShareFlexMessage(category, salesCode);
-
-        // 7. 喚起 LINE 原生分享對象選擇器
+        // 4. 喚起分享器
         const res = await liff.shareTargetPicker([flexMessage]);
 
         if (res) {
-          // 發送成功，關閉 LIFF 視窗回到對話框
-          liff.closeWindow();
+          updateStatus("✅ 卡片已成功發送！");
+          setTimeout(() => liff.closeWindow(), 800);
         } else {
-          // 用戶自行按下取消發送
-          liff.closeWindow();
+          updateStatus("已取消分享");
+          setTimeout(() => liff.closeWindow(), 800);
         }
+
       } catch (err) {
-        console.error("LIFF Share Error: ", err);
-        statusEl.innerText = "分享未完成，請稍後重試。";
-        setTimeout(() => liff.closeWindow(), 2000);
+        showDebugError("執行例外中斷：" + (err.message || err.toString()));
       }
     }
 
-    // ── 組裝標準 Flex 輪播卡片（末卡支援無限二次裂變分享） ──
-    function buildShareFlexMessage(category, salesCode) {
-      // 構建帶推廣碼的短網址
-      const promoUrl = `https://hamibook.tw/sale/${encodeURIComponent(salesCode)}`;
-      // 構建下一位朋友點擊後可再次調用本 LIFF 的二次裂變連結
-      const nextLiffShareUrl = `https://liff.line.me/${MY_LIFF_ID}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(salesCode)}`;
+    // 產生百分之百符合 LINE 官方驗證的標準安全 Flex 結構
+    function buildSafeFlexCard(category, salesCode) {
+      const code = salesCode || "PROMO";
+      const promoUrl = "https://hamibook.tw/sale/" + encodeURIComponent(code);
+      const nextShareUrl = "https://liff.line.me/" + MY_LIFF_ID + "?cat=" + encodeURIComponent(category) + "&code=" + encodeURIComponent(code);
 
       return {
         type: "flex",
-        altText: `📚 好友推薦給您【${category}】即將截止特價好書！`,
+        altText: "📚 好友推薦給您【" + category + "】即將截止特價好書！",
         contents: {
           type: "carousel",
           contents: [
@@ -124,14 +153,14 @@
                 contents: [
                   {
                     type: "text",
-                    text: `【${category}】限時精選特惠`,
+                    text: "【" + category + "】限時精選",
                     weight: "bold",
                     size: "sm",
                     wrap: true
                   },
                   {
                     type: "text",
-                    text: "好友為您挑選的即將截止好書",
+                    text: "好友為您挑選的即將截止特惠書",
                     size: "xs",
                     color: "#888888"
                   }
@@ -176,7 +205,7 @@
                   },
                   {
                     type: "text",
-                    text: `推薦碼：${salesCode}\n覺得這批好書超值？一鍵轉發給更多喜愛閱讀的朋友！`,
+                    text: "推薦碼：" + code + "\n覺得好書超值？一鍵分享給喜愛閱讀的朋友！",
                     size: "xs",
                     color: "#666666",
                     wrap: true
@@ -189,7 +218,7 @@
                     action: {
                       type: "uri",
                       label: "一鍵分享朋友",
-                      uri: nextLiffShareUrl
+                      uri: nextShareUrl
                     }
                   }
                 ]
@@ -200,7 +229,6 @@
       };
     }
 
-    // 啟動主流程
     main();
   </script>
 </body>
