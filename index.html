@@ -119,7 +119,14 @@
         }
 
       } catch (err) {
-        showDebugError("執行例外中斷：" + (err.message || err.toString()));
+        // ── 替換這裡：把錯誤的完整物件詳細細節（含 code、message）全數印出 ──
+        let detail = "";
+        try {
+          detail = JSON.stringify(err, Object.getOwnPropertyNames(err));
+        } catch (e) {
+          detail = err.message || err.toString();
+        }
+        showDebugError("錯誤詳情：" + (err.message || detail));
       }
     }
 
