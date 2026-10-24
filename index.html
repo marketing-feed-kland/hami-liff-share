@@ -3,12 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 強制瀏覽器與 LINE 禁用本機快取 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>正在開啟好書分享...</title>
   <!-- 引入 LINE 官方 LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -50,17 +54,17 @@
       word-break: break-all;
       display: none;
       width: 100%;
-      max-width: 360px;
+      max-width: 400px;
     }
   </style>
 </head>
 <body>
   <div class="spinner" id="spinner"></div>
-  <div class="status" id="statusText">正在準備專屬推薦卡片，請稍候...</div>
+  <div class="status" id="statusText">正在連線 LINE 服務，請稍候...</div>
   <div class="err-log" id="errLog"></div>
 
   <script>
-    // ⚠️ 務必填入你在 LINE Login Channel 拿到的真實 LIFF ID（例如：2007xxxxxx-Abcd1234）
+    // ⚠️ LINE Login Channel LIFF ID
     const MY_LIFF_ID = "2012185997-sJenhi1M";
 
     function showDebugError(msg) {
@@ -76,26 +80,25 @@
     }
 
     async function main() {
-      // 1. 檢查 LIFF ID 是否有填入
       if (!MY_LIFF_ID || MY_LIFF_ID.includes("YOUR_LIFF_ID")) {
         showDebugError("錯誤：未填入正確的 MY_LIFF_ID，請至 GitHub index.html 設定真實 LIFF ID！");
         return;
       }
 
       try {
-        updateStatus("正在連線 LINE 服務 (init)...");
+        updateStatus("正在驗證 LINE 授權 (liff.init)...");
         await liff.init({ liffId: MY_LIFF_ID });
 
-        // 2. 登入檢查
+        // 登入驗證
         if (!liff.isLoggedIn()) {
-          updateStatus("引導授權登入中...");
+          updateStatus("引導登入授權中...");
           liff.login();
           return;
         }
 
-        // 3. 檢查 API 是否可用
+        // 檢查環境支援度
         if (!liff.isApiAvailable("shareTargetPicker")) {
-          showDebugError("您的環境不支援 shareTargetPicker，請確認後台開關為 ON 且由手機 LINE 內部開啟！");
+          showDebugError("您的環境不支援 shareTargetPicker，請確認後台開關為 ON 且在手機 LINE 內開啟！");
           return;
         }
 
@@ -104,10 +107,10 @@
         const category = urlParams.get("cat") || "熱門特惠";
         const salesCode = urlParams.get("code") || "PROMO";
 
-        updateStatus("正在喚起 LINE 好友選擇器...");
-        const flexMessage = buildSafeFlexCard(category, salesCode);
+        updateStatus("組裝專屬特惠書單卡片...");
+        const flexMessage = buildStandardFlexCarousel(category, salesCode);
 
-        // 4. 喚起分享器
+        updateStatus("正在喚起 LINE 原生好友選擇器...");
         const res = await liff.shareTargetPicker([flexMessage]);
 
         if (res) {
@@ -119,7 +122,6 @@
         }
 
       } catch (err) {
-        // ── 替換這裡：把錯誤的完整物件詳細細節（含 code、message）全數印出 ──
         let detail = "";
         try {
           detail = JSON.stringify(err, Object.getOwnPropertyNames(err));
@@ -130,46 +132,97 @@
       }
     }
 
-    // 產生百分之百符合 LINE 官方驗證的標準安全 Flex 結構
-    function buildSafeFlexCard(category, salesCode) {
+    // ── 組裝標準輪播卡片（含封面、書名、AI一句話、促銷價、原價刪除線、無限裂變末卡） ──
+    function buildStandardFlexCarousel(category, salesCode) {
+      const safeCat = category || "熱門特惠";
       const code = salesCode || "PROMO";
+      
       const promoUrl = "https://hamibook.tw/sale/" + encodeURIComponent(code);
-      const nextShareUrl = "https://liff.line.me/" + MY_LIFF_ID + "?cat=" + encodeURIComponent(category) + "&code=" + encodeURIComponent(code);
+      const nextShareUrl = "https://liff.line.me/" + MY_LIFF_ID + "?cat=" + encodeURIComponent(safeCat) + "&code=" + encodeURIComponent(code);
 
       return {
         type: "flex",
-        altText: "📚 好友推薦給您【" + category + "】即將截止特價好書！",
+        altText: `📚 好友為您推薦【${safeCat}】即將截止特價好書！`,
         contents: {
           type: "carousel",
           contents: [
+            // 卡片 1：精選書籍卡片（展示原價刪除線與 AI 一句話推薦）
             {
               type: "bubble",
-              size: "micro",
+              size: "mega",
               hero: {
                 type: "image",
-                url: "https://storage.googleapis.com/hamibook-promotion-export/default_cover.jpg",
+                url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=60",
                 size: "full",
-                aspectRatio: "3:4",
+                aspectRatio: "20:13",
                 aspectMode: "cover"
               },
               body: {
                 type: "box",
                 layout: "vertical",
                 spacing: "sm",
-                paddingAll: "10px",
+                paddingAll: "16px",
                 contents: [
                   {
                     type: "text",
-                    text: "【" + category + "】限時精選",
+                    text: `【${safeCat}】限時精選好書`,
                     weight: "bold",
-                    size: "sm",
+                    size: "md",
                     wrap: true
                   },
+                  // AI 一句話推薦金句
                   {
-                    type: "text",
-                    text: "好友為您挑選的即將截止特惠書",
-                    size: "xs",
-                    color: "#888888"
+                    type: "box",
+                    layout: "horizontal",
+                    spacing: "xs",
+                    margin: "xs",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💡",
+                        size: "xs",
+                        flex: 0
+                      },
+                      {
+                        type: "text",
+                        text: "直擊痛點精選，限時特惠不容錯過的深度好書！",
+                        size: "xs",
+                        color: "#2e7d32",
+                        wrap: true
+                      }
+                    ]
+                  },
+                  // 促銷價 vs 原價刪除線
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    margin: "md",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "NT$ 99 起",
+                        size: "lg",
+                        color: "#ff334b",
+                        weight: "bold",
+                        flex: 0
+                      },
+                      {
+                        type: "text",
+                        text: "NT$ 320",
+                        size: "xs",
+                        color: "#aaaaaa",
+                        decoration: "line-through",
+                        flex: 0
+                      },
+                      {
+                        type: "text",
+                        text: "即將截止",
+                        size: "xxs",
+                        color: "#ff8800",
+                        align: "end"
+                      }
+                    ]
                   }
                 ]
               },
@@ -177,7 +230,7 @@
                 type: "box",
                 layout: "vertical",
                 spacing: "xs",
-                paddingAll: "8px",
+                paddingAll: "12px",
                 contents: [
                   {
                     type: "button",
@@ -186,41 +239,44 @@
                     height: "sm",
                     action: {
                       type: "uri",
-                      label: "查看書單",
+                      label: "立即查看促銷書單",
                       uri: promoUrl
                     }
                   }
                 ]
               }
             },
+            // 卡片 2：無限二次裂變分享末卡
             {
               type: "bubble",
-              size: "micro",
+              size: "mega",
               body: {
                 type: "box",
                 layout: "vertical",
                 justifyContent: "center",
                 alignItems: "center",
                 spacing: "md",
-                paddingAll: "15px",
+                paddingAll: "20px",
                 contents: [
                   {
                     type: "text",
-                    text: "🎁 好康再轉發",
+                    text: "🎁 好康相報",
                     weight: "bold",
-                    size: "md"
+                    size: "xl"
                   },
                   {
                     type: "text",
-                    text: "推薦碼：" + code + "\n覺得好書超值？一鍵分享給喜愛閱讀的朋友！",
+                    text: `推薦碼：${code}\n覺得這批好書超值？把這份限時特惠一鍵分享給愛閱讀的朋友！`,
                     size: "xs",
                     color: "#666666",
+                    align: "center",
                     wrap: true
                   },
                   {
                     type: "button",
                     style: "primary",
                     color: "#06C755",
+                    margin: "md",
                     height: "sm",
                     action: {
                       type: "uri",
