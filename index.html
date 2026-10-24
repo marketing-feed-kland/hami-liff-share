@@ -155,53 +155,56 @@
 
     async function main() {
       try {
+        updateStatus("連線診斷", "步驟 1：準備啟動 LIFF SDK...");
         await liff.init({ liffId: MY_LIFF_ID });
 
-	// 1. 先確認是否在手機 LINE 內開啟
-	if (!liff.isInClient()) {
-  	  showDebugError("請在手機 LINE 內點擊好書卡片開啟！外部瀏覽器不支援發送好友卡片。");
-	  return;
-	}
+        updateStatus("連線診斷", "步驟 2：檢查是否在 LINE 客戶端內...");
+        if (!liff.isInClient()) {
+          showDebugError("請在手機 LINE 內點擊好書卡片開啟！外部瀏覽器不支援發送好友卡片。");
+          return;
+        }
 
-	// 2. 如果在 LINE 內但剛好還沒登入，才需要登入（通常在 LINE 內 init 完就已經登入了）
-	if (!liff.isLoggedIn()) {
- 	   updateStatus("驗證身分", "正在準備身分憑證...");
- 	   liff.login();
- 	   return;
-	}
+        updateStatus("連線診斷", "步驟 3：確認登入狀態...");
+        if (!liff.isLoggedIn()) {
+          updateStatus("驗證身分", "正在準備身分憑證...");
+          liff.login();
+          return;
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const category = urlParams.get("cat") || "熱門特惠";
         const salesCode = urlParams.get("code") || "PROMO";
 
-        updateStatus("載入書單", `正在準備【${category}】精選好書卡片...`);
+        updateStatus("連線診斷", `步驟 4：正在向後端 API 請求【${category}】書單...`);
 
-        // 向 GAS 05.api.gs 取得後端已完全組好的 Bubbles 陣列
         const fetchUrl = `${GAS_API_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(salesCode)}`;
         const response = await fetch(fetchUrl);
+        
+        updateStatus("連線診斷", `步驟 5：API 已回應 (HTTP ${response.status})，解析資料中...`);
         const resJson = await response.json();
 
         if (resJson.status !== "success" || !resJson.data || resJson.data.length === 0) {
-          throw new Error("目前此分類沒有可推薦的書籍資料。");
+          throw new Error("後端回傳格式非 success，或無書籍資料：" + JSON.stringify(resJson));
         }
 
-        // 直接使用後端回傳的完整 Bubbles 陣列組成 Carousel
+        updateStatus("連線診斷", "步驟 6：資料解析完成，準備渲染畫面...");
         cachedFlexMessage = {
           type: "flex",
           altText: `📚 好友為您推薦【${category}】特價好書！`,
           contents: {
             type: "carousel",
-            contents: resJson.data // 👈 完全使用後端資料，與分享者看到的卡片一致
+            contents: resJson.data
           }
         };
 
-        // 更新介面
+        // 成功點亮按鈕
         document.getElementById("spinner").style.display = "none";
         document.getElementById("headerIcon").style.display = "block";
         updateStatus(`【${category}】精選好書`, `好書卡片已準備就緒，點擊下方按鈕即可選擇好友或群組分享！`);
         document.getElementById("shareBtn").style.display = "block";
 
       } catch (err) {
-        showDebugError("錯誤詳情：" + (err.message || JSON.stringify(err)));
+        showDebugError("執行中斷：" + (err.message || JSON.stringify(err)));
       }
     }
 
