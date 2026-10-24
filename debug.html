@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>LIFF 診斷與測試工具</title>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f0f2f5;
+      margin: 0;
+      padding: 16px;
+      color: #333;
+      box-sizing: border-box;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 20px;
+      text-align: center;
+      color: #111;
+    }
+    .check-list {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+    }
+    .check-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+    .check-item:last-child {
+      border-bottom: none;
+    }
+    .badge {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+    .badge-pending { background: #e0e0e0; color: #555; }
+    .badge-ok { background: #d4edda; color: #155724; }
+    .badge-fail { background: #f8d7da; color: #721c24; }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    button {
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-primary { background: #06C755; color: white; }
+    .btn-secondary { background: #4A90E2; color: white; }
+    .btn-warning { background: #ff9800; color: white; }
+    .console-box {
+      margin-top: 16px;
+      background: #1e1e1e;
+      color: #00ff66;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 12px;
+      border-radius: 8px;
+      min-height: 120px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🧪 LIFF 環境診斷面板</h2>
+
+  <ul class="check-list">
+    <li class="check-item">
+      <span>1. SDK 初始化 (init)</span>
+      <span id="initStatus" class="badge badge-pending">檢查中...</span>
+    </li>
+    <li class="check-item">
+      <span>2. 登入狀態 (isLoggedIn)</span>
+      <span id="loginStatus" class="badge badge-pending">檢查中...</span>
+    </li>
+    <li class="check-item">
+      <span>3. LINE App 內開啟 (isInClient)</span>
+      <span id="clientStatus" class="badge badge-pending">檢查中...</span>
+    </li>
+    <li class="check-item">
+      <span>4. ShareTargetPicker API 支援</span>
+      <span id="apiStatus" class="badge badge-pending">檢查中...</span>
+    </li>
+  </ul>
+
+  <div class="btn-group">
+    <!-- 測試按鈕 1：以最純粹的純文字排除 Flex 格式干擾 -->
+    <button id="btnText" class="btn-primary" onclick="testShareText()" disabled>
+      👉 測試 1：發送「極簡純文字」
+    </button>
+
+    <!-- 測試按鈕 2：測試原本的 Flex 卡片結構 -->
+    <button id="btnFlex" class="btn-secondary" onclick="testShareFlex()" disabled>
+      👉 測試 2：發送「Flex 輪播卡片」
+    </button>
+
+    <!-- 輔助操作：清除 Token 並重新登入授權 -->
+    <button class="btn-warning" onclick="forceReauth()">
+      🔄 強制重新授權 (Consent Screen)
+    </button>
+  </div>
+
+  <div class="console-box" id="debugLog">系統日誌待命中...</div>
+</div>
+
+<script>
+  const MY_LIFF_ID = "2012185997-sJenhi1M";
+
+  function log(msg) {
+    const box = document.getElementById("debugLog");
+    const now = new Date().toTimeString().split(" ")[0];
+    box.innerText += `\n[${now}] ${msg}`;
+    box.scrollTop = box.scrollHeight;
+    console.log(msg);
+  }
+
+  function setBadge(id, ok, text) {
+    const el = document.getElementById(id);
+    el.className = "badge " + (ok ? "badge-ok" : "badge-fail");
+    el.innerText = text;
+  }
+
+  async function initDebug() {
+    log("開始執行 LIFF 初始化...");
+    try {
+      await liff.init({ liffId: MY_LIFF_ID });
+      setBadge("initStatus", true, "成功");
+      log("liff.init 成功完成");
+
+      // 檢查是否登入
+      const loggedIn = liff.isLoggedIn();
+      setBadge("loginStatus", loggedIn, loggedIn ? "已登入" : "未登入");
+      log("isLoggedIn: " + loggedIn);
+
+      if (!loggedIn) {
+        log("未登入，請點擊下方的『強制重新授權』按鈕進行登入");
+        return;
+      }
+
+      // 檢查環境是否在 LINE 內
+      const inClient = liff.isInClient();
+      setBadge("clientStatus", inClient, inClient ? "LINE 內部" : "外部瀏覽器");
+      log("isInClient: " + inClient);
+
+      // 檢查 API 支援
+      const canShare = liff.isApiAvailable("shareTargetPicker");
+      setBadge("apiStatus", canShare, canShare ? "支援" : "不支援");
+      log("isApiAvailable(shareTargetPicker): " + canShare);
+
+      if (canShare) {
+        document.getElementById("btnText").disabled = false;
+        document.getElementById("btnFlex").disabled = false;
+        log("✅ 所有檢測通過，請點選上方按鈕發起分享測試。");
+      } else {
+        log("❌ 該環境不支援 ShareTargetPicker，請確認後台開關為 ON。");
+      }
+
+    } catch (err) {
+      setBadge("initStatus", false, "失敗");
+      log("❌ LIFF 初始化例外: " + (err.message || JSON.stringify(err)));
+    }
+  }
+
+  // 測試 1：單純文字
+  async function testShareText() {
+    log("正在呼叫 shareTargetPicker (純文字)...");
+    try {
+      const res = await liff.shareTargetPicker([
+        {
+          type: "text",
+          text: "【LIFF 測試】這是一則純文字好友分享測試！"
+        }
+      ]);
+      if (res) {
+        log("🎉 純文字分享成功！");
+      } else {
+        log("⚠️ 使用者關閉了好友選擇清單。");
+      }
+    } catch (err) {
+      log("💥 純文字測試拋出例外: " + JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    }
+  }
+
+  // 測試 2：Flex Carousel
+  async function testShareFlex() {
+    log("正在呼叫 shareTargetPicker (Flex 卡片)...");
+    const flexPayload = {
+      type: "flex",
+      altText: "📚 測試 Flex 分享",
+      contents: {
+        type: "bubble",
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            { type: "text", text: "測試書籍推廣卡片", weight: "bold", size: "lg" },
+            { type: "text", text: "如果能看到此卡片，代表 Flex 結構正常。", size: "sm", color: "#666666", margin: "md" }
+          ]
+        }
+      }
+    };
+
+    try {
+      const res = await liff.shareTargetPicker([flexPayload]);
+      if (res) {
+        log("🎉 Flex 卡片分享成功！");
+      } else {
+        log("⚠️ 使用者關閉了好友選擇清單。");
+      }
+    } catch (err) {
+      log("💥 Flex 測試拋出例外: " + JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    }
+  }
+
+  // 強制重新授權
+  function forceReauth() {
+    log("導向 LINE 授權頁面...");
+    if (liff.isLoggedIn()) {
+      liff.logout();
+    }
+    liff.login({ redirectUri: window.location.href });
+  }
+
+  initDebug();
+</script>
+</body>
+</html>
