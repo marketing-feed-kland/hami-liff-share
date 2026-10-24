@@ -158,16 +158,18 @@ https://script.google.com/macros/s/AKfycbwaUAUg-ZDW11diWDz7bByzZljprXtBZv6qWGjRS
       try {
         await liff.init({ liffId: MY_LIFF_ID });
 
-        if (!liff.isLoggedIn()) {
-          updateStatus("驗證身分", "正在跳轉至授權畫面...");
-          liff.login({ redirectUri: window.location.href });
-          return;
-        }
+	// 1. 先確認是否在手機 LINE 內開啟
+	if (!liff.isInClient()) {
+  	  showDebugError("請在手機 LINE 內點擊好書卡片開啟！外部瀏覽器不支援發送好友卡片。");
+	  return;
+	}
 
-        if (!liff.isInClient()) {
-          showDebugError("請在手機 LINE 內點擊專屬連結開啟！外部瀏覽器不支援發送好友卡片。");
-          return;
-        }
+	// 2. 如果在 LINE 內但剛好還沒登入，才需要登入（通常在 LINE 內 init 完就已經登入了）
+	if (!liff.isLoggedIn()) {
+ 	   updateStatus("驗證身分", "正在準備身分憑證...");
+ 	   liff.login();
+ 	   return;
+	}
 
         const urlParams = new URLSearchParams(window.location.search);
         const category = urlParams.get("cat") || "熱門特惠";
