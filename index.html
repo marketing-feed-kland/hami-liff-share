@@ -1,6 +1,112 @@
-<script>
-    const MY_LIFF_ID = "2012185997-sJenhi1M";
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwaUAUg-ZDW11diWDz7bByzZljprXtBZv6qWGjRSpbRZFqEAJeFzc9ECjpjXqm8XyuE/exec";
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>好書推薦分享</title>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f7f9fa;
+      color: #333;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .card-box {
+      background: #ffffff;
+      padding: 32px 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    .icon {
+      font-size: 44px;
+      margin-bottom: 12px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #111;
+      margin-bottom: 8px;
+    }
+    .status {
+      font-size: 14px;
+      color: #666;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .btn-share {
+      display: none;
+      width: 100%;
+      background-color: #06C755;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 14px 0;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(6, 199, 85, 0.25);
+    }
+    .btn-share:active {
+      background-color: #05a847;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e3e3e3;
+      border-top: 3px solid #06C755;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .err-log {
+      margin-top: 16px;
+      padding: 12px;
+      background: #ffebee;
+      color: #c62828;
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: left;
+      word-break: break-all;
+      display: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card-box">
+    <div class="spinner" id="spinner"></div>
+    <div class="icon" id="headerIcon" style="display: none;">📚</div>
+    <div class="title" id="mainTitle">連線準備中</div>
+    <div class="status" id="statusText">正在載入專屬推薦書單...</div>
+
+    <button class="btn-share" id="shareBtn" onclick="handleShareClick()">挑選好友／群組發送推薦書單</button>
+    <div class="err-log" id="errLog"></div>
+  </div>
+
+  <script>
+    const MY_LIFF_ID = "2012185997-sJenhi1M"; // 你的 LIFF ID
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwaUAUg-ZDW11diWDz7bByzZljprXtBZv6qWGjRSpbRZFqEAJeFzc9ECjpjXqm8XyuE/exec"; // 05_Api 部署網址
 
     let cachedFlexMessage = null;
 
@@ -9,7 +115,7 @@
       document.getElementById("headerIcon").style.display = "block";
       document.getElementById("headerIcon").innerText = "⚠️";
       document.getElementById("mainTitle").innerText = "載入失敗";
-      document.getElementById("statusText").innerText = "無法取得促銷書單";
+      document.getElementById("statusText").innerText = "無法載入促銷書單";
       const errEl = document.getElementById("errLog");
       errEl.style.display = "block";
       errEl.innerText = msg;
@@ -22,16 +128,13 @@
 
     async function main() {
       try {
-        updateStatus("連線診斷", "步驟 1：啟動 LIFF SDK...");
         await liff.init({ liffId: MY_LIFF_ID });
 
-        updateStatus("連線診斷", "步驟 2：檢查環境...");
         if (!liff.isInClient()) {
-          showDebugError("請在手機 LINE 內點擊好書卡片開啟！外部瀏覽器不支援發送好友卡片。");
+          showDebugError("請在手機 LINE 內開啟，外部瀏覽器無法直接轉發卡片給好友。");
           return;
         }
 
-        updateStatus("連線診斷", "步驟 3：確認登入狀態...");
         if (!liff.isLoggedIn()) {
           liff.login();
           return;
@@ -41,66 +144,32 @@
         const category = urlParams.get("cat") || "熱門特惠";
         const salesCode = urlParams.get("code") || "DEFAULT";
 
-        updateStatus("連線診斷", `步驟 4：請求【${category}】書單...`);
-
         const fetchUrl = `${GAS_API_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(salesCode)}`;
         const response = await fetch(fetchUrl);
         const resJson = await response.json();
 
         if (resJson.status !== "success" || !resJson.data || resJson.data.length === 0) {
-          throw new Error("後端回傳格式非 success，或無書籍資料：" + JSON.stringify(resJson));
+          throw new Error("無法取得書籍資料，請稍後重試。");
         }
 
-        updateStatus("連線診斷", "步驟 5：過濾與轉換合規卡片格式...");
-
-        // ── 關鍵修復：將後端回傳的 postback 全數轉為合規的 uri 導購連結 ──
-        const sanitizedBubbles = resJson.data.map(bubble => {
-          const b = JSON.parse(JSON.stringify(bubble));
-          if (b.footer && b.footer.contents) {
-            b.footer.contents = b.footer.contents.map(item => {
-              if (item.action && item.action.type === "postback") {
-                // 將 postback 轉換為安全的 uri 連結
-                const dataStr = item.action.data || "";
-                let bookId = "0000000000";
-                const match = dataStr.match(/book_id=([^&]+)/);
-                if (match) bookId = match[1];
-
-                const targetUrl = `https://www.hamibook.com.tw/detail/${bookId}?sales_code=${encodeURIComponent(salesCode)}`;
-                return {
-                  type: "button",
-                  style: "primary",
-                  color: "#2C3E50",
-                  height: "sm",
-                  action: {
-                    type: "uri",
-                    label: "前往閱讀",
-                    uri: targetUrl
-                  }
-                };
-              }
-              return item;
-            });
-          }
-          return b;
-        });
-
+        // 組裝標準 Flex Carousel 訊息本體
         cachedFlexMessage = {
           type: "flex",
-          altText: `📚 好友為您推薦【${category}】精選特價好書！`,
+          altText: `📚 好友為您推薦【${category}】精選好書清單！`,
           contents: {
             type: "carousel",
-            contents: sanitizedBubbles
+            contents: resJson.data
           }
         };
 
-        // 成功載入，點亮按鈕
+        // 畫面就緒
         document.getElementById("spinner").style.display = "none";
         document.getElementById("headerIcon").style.display = "block";
-        updateStatus(`【${category}】精選好書`, "好書卡片已準備就緒，點擊下方按鈕即可選擇好友或群組分享！");
+        updateStatus(`【${category}】精選好書`, "專屬書單已準備完成！點擊下方按鈕即可挑選好友或群組分享。");
         document.getElementById("shareBtn").style.display = "block";
 
       } catch (err) {
-        showDebugError("執行中斷：" + (err.message || JSON.stringify(err)));
+        showDebugError("初始化中斷：" + (err.message || JSON.stringify(err)));
       }
     }
 
@@ -116,14 +185,15 @@
           throw new Error("此環境不支援 ShareTargetPicker，請確認 LINE App 是否更新至最新版。");
         }
 
+        // 開啟原生選擇好友視窗，將整份 Flex Carousel 傳送出去
         const res = await liff.shareTargetPicker([cachedFlexMessage]);
         if (res) {
-          updateStatus("發送成功！", "特惠書單已成功分享給好友！視窗即將關閉...");
+          updateStatus("發送成功！", "推薦書單已順利轉發給好友！視窗即將關閉...");
           btn.style.display = "none";
-          setTimeout(() => liff.closeWindow(), 1000);
+          setTimeout(() => liff.closeWindow(), 1200);
         } else {
           btn.disabled = false;
-          btn.innerText = "選擇好友／群組發送書單";
+          btn.innerText = "挑選好友／群組發送推薦書單";
           updateStatus("未發送", "您已取消選擇，隨時可再次點擊分享。");
         }
       } catch (error) {
@@ -135,3 +205,5 @@
 
     main();
   </script>
+</body>
+</html>
