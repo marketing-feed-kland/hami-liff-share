@@ -410,29 +410,18 @@
 
     // ========== 6. 安全呼叫 GAS Web App ==========
     async function sendShareRecordToGas() {
-      try {
-        const token = liff.getAccessToken();
-        if (!token) return;
+	  try {
+		const token = liff.getAccessToken(); // 取得 LINE 原生憑證
+		if (!token) return;
 
-        await fetch(GAS_API_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: new URLSearchParams({
-            action: "incrementShare",
-            token: token,
-            refCode: refCode,
-            topic: topicName,
-            bookCount: bookList.length,
-            timestamp: new Date().toISOString()
-          })
-        });
-      } catch (err) {
-        console.error("累計發送失敗：", err);
-      }
-    }
+		const url = `${GAS_API_URL}?action=incrementShare&token=${encodeURIComponent(token)}&refCode=${encodeURIComponent(refCode)}&topic=${encodeURIComponent(topicName)}&bookCount=${bookList.length}&_t=${Date.now()}`;
+
+		await fetch(url, { method: "GET", mode: "no-cors" });
+		console.log("次數已累計");
+	  } catch (err) {
+		console.error("累計發送失敗：", err);
+	  }
+	}
   </script>
 </body>
 </html>
