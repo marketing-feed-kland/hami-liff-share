@@ -102,14 +102,13 @@
     </div>
 
     <!-- 容器保留空白，由 JS 即刻填入動態資料，不放任何靜態預設字 -->
-    <div class="info-box">
+   <div class="info-box">
       <div class="info-item">
         <span class="info-label">📚 分享主題：</span>
         <span id="topicDisplay"></span>
       </div>
       <div class="info-item">
-        <span class="info-label">🏷️ 專屬推薦碼：</span>
-        <span id="refDisplay"></span>
+        <span id="refDisplay" class="info-label" style="color: #2b6cb0;"></span>
       </div>
     </div>
 
@@ -128,21 +127,21 @@
     let bookList = [];
     let isSubmitting = false;
 
-    // ========== 2. 立即解析 URL 參數並填入畫面 ==========
+// ========== 2. 立即解析 URL 參數並填入畫面 ==========
     (function parseAndFillImmediately() {
       try {
         const params = new URLSearchParams(window.location.search);
 
-        // 主題解析與過濾（防止 User ID 誤傳為主題）
+        // 主題解析與過濾
         const rawTopic = params.get('topic');
         if (rawTopic && !rawTopic.startsWith('U')) {
           topicName = decodeURIComponent(rawTopic);
         }
 
-        // 推薦碼解析（若未帶則顯示 --）
-        refCode = params.get('ref') || "--";
+        // 推薦碼解析
+        refCode = params.get('ref') || "";
 
-        // 動態書籍陣列解析 (格式：書名|特價|原價|封面圖|導購網址)
+        // 動態書籍陣列解析
         const booksParam = params.get('books');
         if (booksParam) {
           const rawItems = booksParam.split(',');
@@ -158,9 +157,16 @@
           }).filter(b => b.title !== "");
         }
 
-        // 即刻渲染至頁面
+        // 即時渲染至頁面
         document.getElementById('topicDisplay').textContent = topicName;
-        document.getElementById('refDisplay').textContent = refCode;
+
+        // 渲染文案：來自Hami書城(231)的推薦
+        const refDisplayEl = document.getElementById('refDisplay');
+        if (refCode) {
+          refDisplayEl.textContent = `🎁 來自Hami書城(${refCode})的推薦`;
+        } else {
+          refDisplayEl.textContent = `🎁 來自Hami書城的推薦`;
+        }
 
       } catch (e) {
         console.error("參數解析失敗：", e);
