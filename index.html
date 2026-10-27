@@ -2,12 +2,9 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>好書相報 - 春水小鎮阿財店員</title>
-  <!-- 引入 LINE LIFF SDK -->
-  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
-  <script>var vConsole = new VConsole();</script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -16,365 +13,351 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
     body {
-      background-color: #f7f9fa;
+      background-color: #f5f6f8;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      padding: 20px;
+      padding: 16px;
     }
     .card {
       background: #ffffff;
       border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-      max-width: 400px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
       width: 100%;
-      padding: 28px 24px;
+      max-width: 400px;
+      padding: 32px 24px;
       text-align: center;
     }
-    .icon {
-      font-size: 54px;
+    .gift-icon {
+      font-size: 56px;
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a202c;
       margin-bottom: 12px;
     }
-    h2 {
-      font-size: 20px;
-      color: #2c3e50;
-      margin-bottom: 8px;
-      font-weight: 700;
-    }
-    p {
+    .desc {
       font-size: 14px;
-      color: #666666;
+      color: #718096;
       line-height: 1.6;
       margin-bottom: 24px;
     }
     .info-box {
-      background-color: #f0f4f8;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 24px;
-      font-size: 13px;
-      color: #34495e;
+      background-color: #f7fafc;
+      border: 1px solid #edf2f7;
+      border-radius: 12px;
+      padding: 16px;
       text-align: left;
+      margin-bottom: 24px;
     }
     .info-item {
-      margin-bottom: 4px;
+      font-size: 14px;
+      color: #4a5568;
+      line-height: 1.8;
+      word-break: break-all;
     }
-    .info-item:last-child {
-      margin-bottom: 0;
+    .info-label {
+      font-weight: 600;
+      color: #2d3748;
     }
     .btn {
-      display: block;
       width: 100%;
-      background-color: #06c755;
+      background-color: #00c300;
       color: #ffffff;
       border: none;
       border-radius: 10px;
-      padding: 14px 0;
+      padding: 14px;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(6, 199, 85, 0.25);
-      transition: background 0.2s, transform 0.1s;
-    }
-    .btn:active {
-      transform: scale(0.98);
-      background-color: #05a847;
+      transition: background-color 0.2s, opacity 0.2s;
     }
     .btn:disabled {
-      background-color: #cccccc;
-      box-shadow: none;
+      background-color: #cbd5e0 !important;
       cursor: not-allowed;
     }
-    .status-msg {
+    .btn:active {
+      background-color: #00a000;
+    }
+    .subtext {
       margin-top: 14px;
-      font-size: 13px;
-      color: #888888;
-      min-height: 20px;
+      font-size: 12px;
+      color: #a0aec0;
+      min-height: 16px;
     }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <div class="icon">🎁</div>
-    <h2>好書相報轉分享</h2>
-    <p>邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。</p>
-
-    <div class="info-box">
-      <div class="info-item">📚 <strong>分享主題：</strong><span id="displayCat">讀取中...</span></div>
-      <div class="info-item">🏷️ <strong>專屬推薦碼：</strong><span id="displayCode">讀取中...</span></div>
+    <div class="gift-icon">🎁</div>
+    <div class="title">好書相報轉分享</div>
+    <div class="desc">
+      邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。
     </div>
 
-    <button id="shareBtn" class="btn" disabled>初始化中...</button>
-    <div id="statusText" class="status-msg">正在載入 LINE 環境...</div>
+    <!-- 容器保留空白，完全不放「讀取中...」等靜態占位字元 -->
+    <div class="info-box">
+      <div class="info-item">
+        <span class="info-label">📚 分享主題：</span>
+        <span id="topicDisplay"></span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">🏷️ 專屬推薦碼：</span>
+        <span id="refDisplay"></span>
+      </div>
+    </div>
+
+    <!-- 按鈕初始不放「初始化中...」，文字全由 JS 判定後填入 -->
+    <button id="shareBtn" class="btn" disabled></button>
+    <div id="subtext" class="subtext"></div>
   </div>
 
-	<!-- 引入 LINE LIFF SDK -->
-	<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+    const LIFF_ID = "2012185997-sJenhi1"; // 
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec"; // 請填入 GAS 部署網址
 
-	<script>
-	// ========== 1. 基礎設定 ==========
-	const LIFF_ID = "2012185997-sJenhi1M"; // 請替換為您的 LIFF ID
-	const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec"; // 請替換為固定版本的 GAS Web App 網址
+    let topicName = "精選好書推薦";
+    let refCode = "";
+    let bookList = [];
+    let isSubmitting = false;
 
-	let topicName = "";
-	let refCode = "";
-	let bookList = [];
-	let isSubmitting = false; // 防連點開關
+    // 1. 腳本一載入，第一時間解析 URL 並直接填入，零等待
+    (function parseAndFillImmediately() {
+      try {
+        const params = new URLSearchParams(window.location.search);
 
-	window.onload = async function() {
-	  await initLiff();
-	  parseUrlParams();
-	  renderUiInfo();
-	  setupEventListeners();
-	};
+        // 主題解析與防呆
+        const rawTopic = params.get('topic');
+        if (rawTopic && !rawTopic.startsWith('U')) {
+          topicName = decodeURIComponent(rawTopic);
+        }
 
-	// ========== 2. LIFF 初始化 ==========
-	async function initLiff() {
-	  try {
-		await liff.init({ liffId: LIFF_ID });
-		// 若未在 LINE 授權登入，自動導向登入以確保能取得 Access Token
-		if (!liff.isLoggedIn()) {
-		  liff.login();
-		}
-	  } catch (err) {
-		console.error("LIFF 初始化失敗：", err);
-	  }
-	}
+        // 推薦碼解析
+        refCode = params.get('ref') || "--";
 
-	// ========== 3. 解析 URL 參數（方案 B：純動態解析） ==========
-	function parseUrlParams() {
-	  const params = new URLSearchParams(window.location.search);
-	  
-	  // 主題名稱過濾：若未傳或誤傳為 User ID，提供預設值
-	  const rawTopic = params.get('topic');
-	  if (rawTopic && !rawTopic.startsWith('U')) {
-		topicName = decodeURIComponent(rawTopic);
-	  } else {
-		topicName = "精選好書推薦";
-	  }
+        // 動態書籍陣列解析
+        const booksParam = params.get('books');
+        if (booksParam) {
+          const rawItems = booksParam.split(',');
+          bookList = rawItems.map(item => {
+            const parts = decodeURIComponent(item).split('|');
+            return {
+              title: parts[0] ? parts[0].trim() : "精選好書",
+              salePrice: parts[1] ? parts[1].trim() : "",
+              origPrice: parts[2] ? parts[2].trim() : "",
+              imageUrl: parts[3] ? parts[3].trim() : "https://placehold.co/300x400?text=Book",
+              bookUrl: parts[4] ? parts[4].trim() : ""
+            };
+          }).filter(b => b.title !== "");
+        }
 
-	  // 專屬推薦碼
-	  refCode = params.get('ref') || "";
+        // 直接寫入文字，完全不經過「讀取中」狀態
+        document.getElementById('topicDisplay').textContent = topicName;
+        document.getElementById('refDisplay').textContent = refCode;
 
-	  // 解析書籍陣列 (格式：書名|特價|原價|圖片網址|導購網址)
-	  const booksParam = params.get('books');
-	  if (booksParam) {
-		try {
-		  const bookItems = decodeURIComponent(booksParam).split(',');
-		  bookList = bookItems.map(item => {
-			const parts = item.split('|');
-			return {
-			  title: parts[0] || "精選書籍",
-			  salePrice: parts[1] || "",
-			  origPrice: parts[2] || "",
-			  imageUrl: parts[3] || "https://placehold.co/300x400?text=Book",
-			  bookUrl: parts[4] || ""
-			};
-		  }).filter(b => b.title.trim() !== "");
-		} catch (e) {
-		  console.error("解析 URL 書籍資料失敗：", e);
-		  bookList = [];
-		}
-	  }
-	}
+      } catch (e) {
+        console.error("即時解析參數失敗：", e);
+      }
+    })();
 
-	// ========== 4. 畫面資訊更新與狀態控制 ==========
-	function renderUiInfo() {
-	  const topicElement = document.getElementById("topic-display");
-	  if (topicElement) {
-		topicElement.innerText = topicName;
-	  }
-	  
-	  const refElement = document.getElementById("ref-display");
-	  if (refElement) {
-		refElement.innerText = refCode || "--";
-	  }
+    // 2. 視窗就緒後處理 LIFF 環境與按鈕狀態
+    window.onload = async function() {
+      const shareBtn = document.getElementById("shareBtn");
+      const subtext = document.getElementById("subtext");
 
-	  // 若無書籍資料，鎖定按鈕避免送出空訊息
-	  const shareBtn = document.getElementById("share-btn");
-	  if (bookList.length === 0 && shareBtn) {
-		shareBtn.style.backgroundColor = "#cccccc";
-		shareBtn.style.cursor = "not-allowed";
-		shareBtn.innerText = "查無待分享書單";
-	  }
-	}
+      try {
+        await liff.init({ liffId: LIFF_ID });
 
-	// ========== 5. 組裝多本輪播 Flex Message ==========
-	function buildBookFlexMessage() {
-	  if (bookList.length === 0) return null;
+        if (!liff.isLoggedIn()) {
+          shareBtn.textContent = "請登入 LINE";
+          shareBtn.disabled = false;
+          shareBtn.onclick = () => liff.login();
+          subtext.textContent = "需登入 LINE 帳號以啟用好友分享";
+          return;
+        }
 
-	  const bubbles = bookList.map(book => {
-		const priceContents = [];
-		if (book.salePrice) {
-		  priceContents.push({
-			type: "text",
-			text: book.salePrice,
-			color: "#e53e3e",
-			size: "sm",
-			weight: "bold",
-			flex: 0
-		  });
-		}
-		if (book.origPrice) {
-		  priceContents.push({
-			type: "text",
-			text: book.origPrice,
-			color: "#aaaaaa",
-			size: "xxs",
-			decoration: "line-through",
-			margin: "sm"
-		  });
-		}
+        if (bookList.length === 0) {
+          shareBtn.textContent = "查無待分享書單";
+          shareBtn.disabled = true;
+          subtext.textContent = "連結未夾帶待分享書籍清單";
+          return;
+        }
 
-		return {
-		  type: "bubble",
-		  size: "micro",
-		  hero: {
-			type: "image",
-			url: book.imageUrl,
-			size: "full",
-			aspectMode: "cover",
-			aspectRatio: "3:4"
-		  },
-		  body: {
-			type: "box",
-			layout: "vertical",
-			spacing: "sm",
-			paddingAll: "10px",
-			contents: [
-			  {
-				type: "text",
-				text: book.title,
-				weight: "bold",
-				size: "sm",
-				wrap: true,
-				maxLines: 2
-			  },
-			  ...(priceContents.length > 0 ? [{
-				type: "box",
-				layout: "baseline",
-				contents: priceContents
-			  }] : [])
-			]
-		  },
-		  footer: {
-			type: "box",
-			layout: "vertical",
-			paddingAll: "8px",
-			contents: [
-			  {
-				type: "button",
-				style: "primary",
-				color: "#00c300",
-				height: "sm",
-				action: {
-				  type: "uri",
-				  label: "登入領取好書",
-				  uri: book.bookUrl || `https://liff.line.me/${LIFF_ID}?ref=${refCode}`
-				}
-			  }
-			]
-		  }
-		};
-	  });
+        // 資料與環境正常
+        shareBtn.textContent = "挑選好友立即分享";
+        shareBtn.disabled = false;
+        subtext.textContent = "點選按鈕挑選好友即可發送！";
 
-	  return {
-		type: "flex",
-		altText: `好友贈書推薦：${topicName}`,
-		contents: {
-		  type: "carousel",
-		  contents: bubbles
-		}
-	  };
-	}
+      } catch (err) {
+        console.error("LIFF 載入失敗：", err);
+        shareBtn.textContent = "請於手機 LINE 開啟";
+        shareBtn.disabled = true;
+      }
 
-	// ========== 6. 綁定按鈕與安全送出流程 ==========
-	function setupEventListeners() {
-	  const shareBtn = document.getElementById("share-btn");
-	  if (!shareBtn) return;
+      setupEventListeners();
+    };
 
-	  shareBtn.addEventListener("click", async () => {
-		// 1. 防重複點擊
-		if (isSubmitting) return;
+    // 3. 組裝多本輪播 Flex Message
+    function buildBookFlexMessage() {
+      if (bookList.length === 0) return null;
 
-		if (bookList.length === 0) {
-		  alert("目前連結中未包含任何書籍資料。");
-		  return;
-		}
+      const bubbles = bookList.map(book => {
+        const priceContents = [];
+        if (book.salePrice) {
+          priceContents.push({
+            type: "text",
+            text: book.salePrice,
+            color: "#e53e3e",
+            size: "sm",
+            weight: "bold",
+            flex: 0
+          });
+        }
+        if (book.origPrice) {
+          priceContents.push({
+            type: "text",
+            text: book.origPrice,
+            color: "#aaaaaa",
+            size: "xxs",
+            decoration: "line-through",
+            margin: "sm"
+          });
+        }
 
-		if (!liff.isApiAvailable("shareTargetPicker")) {
-		  alert("目前環境不支援好友分享功能，請於手機 LINE 應用程式內開啟。");
-		  return;
-		}
+        return {
+          type: "bubble",
+          size: "micro",
+          hero: {
+            type: "image",
+            url: book.imageUrl,
+            size: "full",
+            aspectMode: "cover",
+            aspectRatio: "3:4"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            spacing: "sm",
+            paddingAll: "10px",
+            contents: [
+              {
+                type: "text",
+                text: book.title,
+                weight: "bold",
+                size: "sm",
+                wrap: true,
+                maxLines: 2
+              },
+              ...(priceContents.length > 0 ? [{
+                type: "box",
+                layout: "baseline",
+                contents: priceContents
+              }] : [])
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            paddingAll: "8px",
+            contents: [
+              {
+                type: "button",
+                style: "primary",
+                color: "#00c300",
+                height: "sm",
+                action: {
+                  type: "uri",
+                  label: "登入領取好書",
+                  uri: book.bookUrl || `https://liff.line.me/${LIFF_ID}?ref=${refCode}`
+                }
+              }
+            ]
+          }
+        };
+      });
 
-		try {
-		  const flexContent = buildBookFlexMessage();
-		  if (!flexContent) return;
+      return {
+        type: "flex",
+        altText: `好友贈書推薦：${topicName}`,
+        contents: {
+          type: "carousel",
+          contents: bubbles
+        }
+      };
+    }
 
-		  // 呼叫 LINE 分享視窗
-		  const res = await liff.shareTargetPicker([flexContent]);
+    // 4. 按鈕點擊與回傳邏輯
+    function setupEventListeners() {
+      const shareBtn = document.getElementById("shareBtn");
+      if (!shareBtn) return;
 
-		  if (res) {
-			// 設定鎖定狀態與按鈕載入提示
-			isSubmitting = true;
-			shareBtn.innerText = "紀錄中，請稍候...";
-			shareBtn.style.opacity = "0.7";
+      shareBtn.addEventListener("click", async () => {
+        if (isSubmitting || bookList.length === 0) return;
 
-			// 安全發送：只帶 Token，不帶明文 userId
-			await recordShareCountSecurely();
+        if (!liff.isApiAvailable("shareTargetPicker")) {
+          alert("目前環境不支援挑選好友功能，請於手機 LINE 應用程式內開啟。");
+          return;
+        }
 
-			alert("分享成功！推薦次數已累計。");
-			liff.closeWindow();
-		  } else {
-			console.log("使用者關閉分享視窗");
-		  }
-		} catch (err) {
-		  console.error("分享流程發生錯誤：", err);
-		  alert("分享失敗，請稍後再試。");
-		} finally {
-		  isSubmitting = false;
-		  if (shareBtn && bookList.length > 0) {
-			shareBtn.innerText = "挑選好友立即分享";
-			shareBtn.style.opacity = "1";
-		  }
-		}
-	  });
-	}
+        try {
+          const flexContent = buildBookFlexMessage();
+          if (!flexContent) return;
 
-	// ========== 7. 安全回傳累計次數（發送動態 Access Token） ==========
-	async function recordShareCountSecurely() {
-	  try {
-		// 取得 LINE 授權的短效憑證
-		const accessToken = liff.getAccessToken();
+          const res = await liff.shareTargetPicker([flexContent]);
 
-		if (!accessToken) {
-		  console.warn("無法取得 LINE Access Token，略過累計");
-		  return;
-		}
+          if (res) {
+            isSubmitting = true;
+            shareBtn.textContent = "紀錄中...";
+            shareBtn.disabled = true;
 
-		// 發送至後端 GAS
-		await fetch(GAS_API_URL, {
-		  method: "POST",
-		  mode: "no-cors",
-		  headers: {
-			"Content-Type": "application/x-www-form-urlencoded"
-		  },
-		  body: new URLSearchParams({
-			action: "incrementShare",
-			token: accessToken, // 傳送短效憑證進行後端鑑權
-			refCode: refCode,
-			topic: topicName,
-			bookCount: bookList.length,
-			timestamp: new Date().toISOString()
-		  })
-		});
-		console.log("累計次數請求已送出");
-	  } catch (err) {
-		console.error("累計次數發送失敗：", err);
-	  }
-	}
-	</script>
+            await sendShareRecordToGas();
+
+            alert("分享成功！推薦次數已累計。");
+            liff.closeWindow();
+          }
+        } catch (err) {
+          console.error("分享流程發生錯誤：", err);
+          alert("分享發生錯誤，請稍後再試。");
+        } finally {
+          isSubmitting = false;
+          if (shareBtn && bookList.length > 0) {
+            shareBtn.textContent = "挑選好友立即分享";
+            shareBtn.disabled = false;
+          }
+        }
+      });
+    }
+
+    // 5. 累計次數回傳至 GAS
+    async function sendShareRecordToGas() {
+      try {
+        const token = liff.getAccessToken();
+        if (!token) return;
+
+        await fetch(GAS_API_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: new URLSearchParams({
+            action: "incrementShare",
+            token: token,
+            refCode: refCode,
+            topic: topicName,
+            bookCount: bookList.length,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch (err) {
+        console.error("累計發送失敗：", err);
+      }
+    }
+  </script>
 </body>
 </html>
