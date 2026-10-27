@@ -89,6 +89,10 @@
       font-size: 12px;
       color: #a0aec0;
       min-height: 16px;
+      word-break: break-word;
+    }
+    .subtext.error {
+      color: #e53e3e;
     }
   </style>
 </head>
@@ -101,47 +105,42 @@
       邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。
     </div>
 
-    <!-- 容器保留空白，由 JS 即刻填入動態資料，不放任何靜態預設字 -->
-   <div class="info-box">
+    <div class="info-box">
       <div class="info-item">
         <span class="info-label">📚 分享主題：</span>
-        <span id="topicDisplay"></span>
+        <span id="topicDisplay">載入中...</span>
       </div>
       <div class="info-item">
         <span id="refDisplay" class="info-label" style="color: #2b6cb0;"></span>
       </div>
     </div>
 
-    <!-- 按鈕初始不放字，避免初始化延遲產生誤導 -->
-    <button id="shareBtn" class="btn" disabled></button>
-    <div id="subtext" class="subtext"></div>
+    <button id="shareBtn" class="btn" disabled>連線檢查中...</button>
+    <div id="subtext" class="subtext">正在初始化 LINE 服務...</div>
   </div>
 
   <script>
     // ========== 1. 核心參數設定 ==========
-    const LIFF_ID = "2012185997-sJenhi1"; // LIFF ID
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec"; // 請填入固定版 GAS Web App 網址
+    const LIFF_ID = "2012185997-sJenhi1";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec";
 
     let topicName = "精選好書推薦";
     let refCode = "";
     let bookList = [];
     let isSubmitting = false;
 
-// ========== 2. 立即解析 URL 參數並填入畫面 ==========
+    // ========== 2. 解析 URL 參數並即時填入畫面 ==========
     (function parseAndFillImmediately() {
       try {
         const params = new URLSearchParams(window.location.search);
 
-        // 主題解析與過濾
         const rawTopic = params.get('topic');
         if (rawTopic && !rawTopic.startsWith('U')) {
           topicName = decodeURIComponent(rawTopic);
         }
 
-        // 推薦碼解析
         refCode = params.get('ref') || "";
 
-        // 動態書籍陣列解析
         const booksParam = params.get('books');
         if (booksParam) {
           const rawItems = booksParam.split(',');
@@ -157,10 +156,8 @@
           }).filter(b => b.title !== "");
         }
 
-        // 即時渲染至頁面
         document.getElementById('topicDisplay').textContent = topicName;
 
-        // 渲染文案：來自Hami書城(231)的推薦
         const refDisplayEl = document.getElementById('refDisplay');
         if (refCode) {
           refDisplayEl.textContent = `🎁 來自Hami書城(${refCode})的推薦`;
@@ -181,6 +178,7 @@
       try {
         await liff.init({ liffId: LIFF_ID });
 
+        // 未登入狀況導引
         if (!liff.isLoggedIn()) {
           shareBtn.textContent = "請登入 LINE";
           shareBtn.disabled = false;
@@ -189,6 +187,16 @@
           return;
         }
 
+        // 檢查環境是否支援 shareTargetPicker
+        if (!liff.isApiAvailable("shareTargetPicker")) {
+          shareBtn.textContent = "請於手機 LINE 開啟";
+          shareBtn.disabled = true;
+          subtext.className = "subtext error";
+          subtext.textContent = "環境未支援轉發，或後台未開啟 Share Target Picker 權限。";
+          return;
+        }
+
+        // 書單參數缺失提示
         if (bookList.length === 0) {
           shareBtn.textContent = "查無待分享書單";
           shareBtn.disabled = true;
@@ -196,25 +204,27 @@
           return;
         }
 
-        // 環境就緒
+        // 正常啟用
         shareBtn.textContent = "挑選好友立即分享";
         shareBtn.disabled = false;
+        subtext.className = "subtext";
         subtext.textContent = "點選按鈕挑選好友即可發送！";
 
       } catch (err) {
         console.error("LIFF 載入失敗：", err);
-        shareBtn.textContent = "請於手機 LINE 開啟";
+        shareBtn.textContent = "系統初始化失敗";
         shareBtn.disabled = true;
+        subtext.className = "subtext error";
+        subtext.textContent = `錯誤碼：${err.code || "INIT_FAIL"}（${err.message || err}）`;
       }
 
       setupEventListeners();
     };
 
-    // ========== 4. 組裝 Flex Message 多本輪播 + 尾張轉分享卡片（裂變繼承推薦碼） ==========
+    // ========== 4. 組裝 Flex Message ==========
     function buildBookFlexMessage() {
       if (bookList.length === 0) return null;
 
-      // 4-1. 書籍 Bubble 陣列
       const bookBubbles = bookList.map(book => {
         const priceContents = [];
         if (book.salePrice) {
@@ -290,14 +300,12 @@
         };
       });
 
-      // 4-2. 重新打包原始書籍字串，確保 B/C/D 轉發時書單與最初 A 的推薦碼完全一致
       const booksParamString = bookList.map(b => 
         `${b.title}|${b.salePrice}|${b.origPrice}|${b.imageUrl}|${b.bookUrl}`
       ).join(",");
 
       const chainShareUrl = `https://liff.line.me/${LIFF_ID}?topic=${encodeURIComponent(topicName)}&ref=${encodeURIComponent(refCode)}&books=${encodeURIComponent(booksParamString)}`;
 
-      // 4-3. 最後一張：好書相報轉分享 Bubble 卡片
       const shareActionBubble = {
         type: "bubble",
         size: "micro",
@@ -353,7 +361,6 @@
         }
       };
 
-      // 4-4. 合併為同一個 Carousel 輪播
       return {
         type: "flex",
         altText: `好友贈書推薦：${topicName}`,
@@ -373,7 +380,7 @@
         if (isSubmitting || bookList.length === 0) return;
 
         if (!liff.isApiAvailable("shareTargetPicker")) {
-          alert("目前環境不支援挑選好友功能，請於手機 LINE 應用程式內開啟。");
+          alert("目前環境不支援挑選好友功能，請確認 LINE 應用程式已更新或後台已啟用該權限。");
           return;
         }
 
@@ -381,7 +388,6 @@
           const flexContent = buildBookFlexMessage();
           if (!flexContent) return;
 
-          // 開啟原生好友選擇視窗
           const res = await liff.shareTargetPicker([flexContent]);
 
           if (res) {
@@ -389,7 +395,6 @@
             shareBtn.textContent = "紀錄中...";
             shareBtn.disabled = true;
 
-            // 安全回傳 Access Token 給後端 GAS 累計次數
             await sendShareRecordToGas();
 
             alert("分享成功！推薦次數已累計。");
@@ -408,20 +413,20 @@
       });
     }
 
-    // ========== 6. 安全呼叫 GAS Web App ==========
+    // ========== 6. 呼叫 GAS Web App ==========
     async function sendShareRecordToGas() {
-	  try {
-		const token = liff.getAccessToken(); // 取得 LINE 原生憑證
-		if (!token) return;
+      try {
+        const token = liff.getAccessToken();
+        if (!token) return;
 
-		const url = `${GAS_API_URL}?action=incrementShare&token=${encodeURIComponent(token)}&refCode=${encodeURIComponent(refCode)}&topic=${encodeURIComponent(topicName)}&bookCount=${bookList.length}&_t=${Date.now()}`;
+        const url = `${GAS_API_URL}?action=incrementShare&token=${encodeURIComponent(token)}&refCode=${encodeURIComponent(refCode)}&topic=${encodeURIComponent(topicName)}&bookCount=${bookList.length}&_t=${Date.now()}`;
 
-		await fetch(url, { method: "GET", mode: "no-cors" });
-		console.log("次數已累計");
-	  } catch (err) {
-		console.error("累計發送失敗：", err);
-	  }
-	}
+        await fetch(url, { method: "GET", mode: "no-cors" });
+        console.log("次數已累計");
+      } catch (err) {
+        console.error("累計發送失敗：", err);
+      }
+    }
   </script>
 </body>
 </html>
