@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>好書相報 - 春水小鎮阿財店員</title>
+  <!-- 引入 LINE LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * {
@@ -100,7 +101,7 @@
       邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。
     </div>
 
-    <!-- 容器保留空白，完全不放「讀取中...」等靜態占位字元 -->
+    <!-- 容器保留空白，由 JS 即刻填入動態資料，不放任何靜態預設字 -->
     <div class="info-box">
       <div class="info-item">
         <span class="info-label">📚 分享主題：</span>
@@ -112,42 +113,43 @@
       </div>
     </div>
 
-    <!-- 按鈕初始不放「初始化中...」，文字全由 JS 判定後填入 -->
+    <!-- 按鈕初始不放字，避免初始化延遲產生誤導 -->
     <button id="shareBtn" class="btn" disabled></button>
     <div id="subtext" class="subtext"></div>
   </div>
 
   <script>
-    const LIFF_ID = "2012185997-sJenhi1"; // 
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec"; // 請填入 GAS 部署網址
+    // ========== 1. 核心參數設定 ==========
+    const LIFF_ID = "2012185997-sJenhi1"; // LIFF ID
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec"; // 請填入固定版 GAS Web App 網址
 
     let topicName = "精選好書推薦";
     let refCode = "";
     let bookList = [];
     let isSubmitting = false;
 
-    // 1. 腳本一載入，第一時間解析 URL 並直接填入，零等待
+    // ========== 2. 立即解析 URL 參數並填入畫面 ==========
     (function parseAndFillImmediately() {
       try {
         const params = new URLSearchParams(window.location.search);
 
-        // 主題解析與防呆
+        // 主題解析與過濾（防止 User ID 誤傳為主題）
         const rawTopic = params.get('topic');
         if (rawTopic && !rawTopic.startsWith('U')) {
           topicName = decodeURIComponent(rawTopic);
         }
 
-        // 推薦碼解析
+        // 推薦碼解析（若未帶則顯示 --）
         refCode = params.get('ref') || "--";
 
-        // 動態書籍陣列解析
+        // 動態書籍陣列解析 (格式：書名|特價|原價|封面圖|導購網址)
         const booksParam = params.get('books');
         if (booksParam) {
           const rawItems = booksParam.split(',');
           bookList = rawItems.map(item => {
             const parts = decodeURIComponent(item).split('|');
             return {
-              title: parts[0] ? parts[0].trim() : "精選好書",
+              title: parts[0] ? parts[0].trim() : "精選書籍",
               salePrice: parts[1] ? parts[1].trim() : "",
               origPrice: parts[2] ? parts[2].trim() : "",
               imageUrl: parts[3] ? parts[3].trim() : "https://placehold.co/300x400?text=Book",
@@ -156,16 +158,16 @@
           }).filter(b => b.title !== "");
         }
 
-        // 直接寫入文字，完全不經過「讀取中」狀態
+        // 即刻渲染至頁面
         document.getElementById('topicDisplay').textContent = topicName;
         document.getElementById('refDisplay').textContent = refCode;
 
       } catch (e) {
-        console.error("即時解析參數失敗：", e);
+        console.error("參數解析失敗：", e);
       }
     })();
 
-    // 2. 視窗就緒後處理 LIFF 環境與按鈕狀態
+    // ========== 3. LIFF 環境初始化與按鈕狀態控管 ==========
     window.onload = async function() {
       const shareBtn = document.getElementById("shareBtn");
       const subtext = document.getElementById("subtext");
@@ -184,11 +186,11 @@
         if (bookList.length === 0) {
           shareBtn.textContent = "查無待分享書單";
           shareBtn.disabled = true;
-          subtext.textContent = "連結未夾帶待分享書籍清單";
+          subtext.textContent = "未接收到待轉發的書籍清單";
           return;
         }
 
-        // 資料與環境正常
+        // 環境就緒
         shareBtn.textContent = "挑選好友立即分享";
         shareBtn.disabled = false;
         subtext.textContent = "點選按鈕挑選好友即可發送！";
@@ -202,11 +204,12 @@
       setupEventListeners();
     };
 
-    // 3. 組裝多本輪播 Flex Message
+    // ========== 4. 組裝 Flex Message 多本輪播 + 尾張轉分享卡片（裂變繼承推薦碼） ==========
     function buildBookFlexMessage() {
       if (bookList.length === 0) return null;
 
-      const bubbles = bookList.map(book => {
+      // 4-1. 書籍 Bubble 陣列
+      const bookBubbles = bookList.map(book => {
         const priceContents = [];
         if (book.salePrice) {
           priceContents.push({
@@ -281,17 +284,81 @@
         };
       });
 
+      // 4-2. 重新打包原始書籍字串，確保 B/C/D 轉發時書單與最初 A 的推薦碼完全一致
+      const booksParamString = bookList.map(b => 
+        `${b.title}|${b.salePrice}|${b.origPrice}|${b.imageUrl}|${b.bookUrl}`
+      ).join(",");
+
+      const chainShareUrl = `https://liff.line.me/${LIFF_ID}?topic=${encodeURIComponent(topicName)}&ref=${encodeURIComponent(refCode)}&books=${encodeURIComponent(booksParamString)}`;
+
+      // 4-3. 最後一張：好書相報轉分享 Bubble 卡片
+      const shareActionBubble = {
+        type: "bubble",
+        size: "micro",
+        body: {
+          type: "box",
+          layout: "vertical",
+          spacing: "md",
+          justifyContent: "center",
+          alignItems: "center",
+          paddingAll: "14px",
+          contents: [
+            {
+              type: "text",
+              text: "🎁",
+              size: "xxl",
+              align: "center"
+            },
+            {
+              type: "text",
+              text: "好書相報轉分享",
+              weight: "bold",
+              size: "md",
+              align: "center",
+              wrap: true
+            },
+            {
+              type: "text",
+              text: "挑選 LINE 好友或群組\n轉發這組精選好書",
+              size: "xxs",
+              color: "#888888",
+              align: "center",
+              wrap: true
+            }
+          ]
+        },
+        footer: {
+          type: "box",
+          layout: "vertical",
+          paddingAll: "8px",
+          contents: [
+            {
+              type: "button",
+              style: "primary",
+              color: "#00c300",
+              height: "sm",
+              action: {
+                type: "uri",
+                label: "好書相報轉分享",
+                uri: chainShareUrl
+              }
+            }
+          ]
+        }
+      };
+
+      // 4-4. 合併為同一個 Carousel 輪播
       return {
         type: "flex",
         altText: `好友贈書推薦：${topicName}`,
         contents: {
           type: "carousel",
-          contents: bubbles
+          contents: [...bookBubbles, shareActionBubble]
         }
       };
     }
 
-    // 4. 按鈕點擊與回傳邏輯
+    // ========== 5. 綁定按鈕點擊與發送流程 ==========
     function setupEventListeners() {
       const shareBtn = document.getElementById("shareBtn");
       if (!shareBtn) return;
@@ -308,6 +375,7 @@
           const flexContent = buildBookFlexMessage();
           if (!flexContent) return;
 
+          // 開啟原生好友選擇視窗
           const res = await liff.shareTargetPicker([flexContent]);
 
           if (res) {
@@ -315,6 +383,7 @@
             shareBtn.textContent = "紀錄中...";
             shareBtn.disabled = true;
 
+            // 安全回傳 Access Token 給後端 GAS 累計次數
             await sendShareRecordToGas();
 
             alert("分享成功！推薦次數已累計。");
@@ -333,7 +402,7 @@
       });
     }
 
-    // 5. 累計次數回傳至 GAS
+    // ========== 6. 安全呼叫 GAS Web App ==========
     async function sendShareRecordToGas() {
       try {
         const token = liff.getAccessToken();
