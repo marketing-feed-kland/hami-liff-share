@@ -2,208 +2,328 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>好書推薦分享</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>好書相報 - 春水小鎮阿財店員</title>
+  <!-- 引入 LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background-color: #f7f9fa;
-      color: #333;
-      padding: 24px;
+    * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body {
+      background-color: #f7f9fa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      max-width: 400px;
+      width: 100%;
+      padding: 28px 24px;
       text-align: center;
     }
-    .card-box {
-      background: #ffffff;
-      padding: 32px 24px;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-      width: 100%;
-      max-width: 380px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      box-sizing: border-box;
-    }
     .icon {
-      font-size: 44px;
+      font-size: 54px;
       margin-bottom: 12px;
     }
-    .title {
-      font-size: 18px;
-      font-weight: bold;
-      color: #111;
+    h2 {
+      font-size: 20px;
+      color: #2c3e50;
       margin-bottom: 8px;
+      font-weight: 700;
     }
-    .status {
+    p {
       font-size: 14px;
-      color: #666;
-      line-height: 1.5;
-      margin-bottom: 20px;
+      color: #666666;
+      line-height: 1.6;
+      margin-bottom: 24px;
     }
-    .btn-share {
-      display: none;
+    .info-box {
+      background-color: #f0f4f8;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 24px;
+      font-size: 13px;
+      color: #34495e;
+      text-align: left;
+    }
+    .info-item {
+      margin-bottom: 4px;
+    }
+    .info-item:last-child {
+      margin-bottom: 0;
+    }
+    .btn {
+      display: block;
       width: 100%;
-      background-color: #06C755;
-      color: #fff;
-      font-size: 16px;
-      font-weight: 600;
-      padding: 14px 0;
+      background-color: #06c755;
+      color: #ffffff;
       border: none;
       border-radius: 10px;
+      padding: 14px 0;
+      font-size: 16px;
+      font-weight: 600;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(6, 199, 85, 0.25);
+      transition: background 0.2s, transform 0.1s;
     }
-    .btn-share:active {
+    .btn:active {
+      transform: scale(0.98);
       background-color: #05a847;
     }
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid #e3e3e3;
-      border-top: 3px solid #06C755;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
+    .btn:disabled {
+      background-color: #cccccc;
+      box-shadow: none;
+      cursor: not-allowed;
     }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .err-log {
-      margin-top: 16px;
-      padding: 12px;
-      background: #ffebee;
-      color: #c62828;
-      border-radius: 8px;
-      font-size: 12px;
-      text-align: left;
-      word-break: break-all;
-      display: none;
-      width: 100%;
-      box-sizing: border-box;
+    .status-msg {
+      margin-top: 14px;
+      font-size: 13px;
+      color: #888888;
+      min-height: 20px;
     }
   </style>
 </head>
 <body>
 
-  <div class="card-box">
-    <div class="spinner" id="spinner"></div>
-    <div class="icon" id="headerIcon" style="display: none;">📚</div>
-    <div class="title" id="mainTitle">連線準備中</div>
-    <div class="status" id="statusText">正在載入專屬推薦書單...</div>
+  <div class="card">
+    <div class="icon">🎁</div>
+    <h2>好書相報轉分享</h2>
+    <p>邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。</p>
 
-    <button class="btn-share" id="shareBtn" onclick="handleShareClick()">挑選好友／群組發送推薦書單</button>
-    <div class="err-log" id="errLog"></div>
+    <div class="info-box">
+      <div class="info-item">📚 <strong>分享主題：</strong><span id="displayCat">讀取中...</span></div>
+      <div class="info-item">🏷️ <strong>專屬推薦碼：</strong><span id="displayCode">讀取中...</span></div>
+    </div>
+
+    <button id="shareBtn" class="btn" disabled>初始化中...</button>
+    <div id="statusText" class="status-msg">正在載入 LINE 環境...</div>
   </div>
 
   <script>
-    const MY_LIFF_ID = "2012185997-sJenhi1M"; // 你的 LIFF ID
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwaUAUg-ZDW11diWDz7bByzZljprXtBZv6qWGjRSpbRZFqEAJeFzc9ECjpjXqm8XyuE/exec"; // 05_Api 部署網址
+    // ══════════════════════════════════════════════════════════
+    // ⚙️ 核心設定區
+    // ══════════════════════════════════════════════════════════
+    const LIFF_ID = "2012185997-sJenhi1M"; 
+    // 請確認替換為您的 GAS Web App 部署網址（以 /exec 結尾）
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz_XXXXXXXXXX_YOUR_GAS_ID_HERE/exec";
 
-    let cachedFlexMessage = null;
+    // 取得網址參數
+    const urlParams = new URLSearchParams(window.location.search);
+    const category = urlParams.get('cat') || '精選特惠';
+    const promoCode = urlParams.get('code') || 'DEFAULT';
+    let urlUserId = urlParams.get('uid') || '';
+    const bidsParam = urlParams.get('bids') || '';
 
-    function showDebugError(msg) {
-      document.getElementById("spinner").style.display = "none";
-      document.getElementById("headerIcon").style.display = "block";
-      document.getElementById("headerIcon").innerText = "⚠️";
-      document.getElementById("mainTitle").innerText = "載入失敗";
-      document.getElementById("statusText").innerText = "無法載入促銷書單";
-      const errEl = document.getElementById("errLog");
-      errEl.style.display = "block";
-      errEl.innerText = msg;
-    }
+    // 渲染畫面資訊
+    document.getElementById('displayCat').innerText = category;
+    document.getElementById('displayCode').innerText = promoCode;
 
-    function updateStatus(title, text) {
-      if (title) document.getElementById("mainTitle").innerText = title;
-      if (text) document.getElementById("statusText").innerText = text;
-    }
+    const shareBtn = document.getElementById('shareBtn');
+    const statusText = document.getElementById('statusText');
 
-    async function main() {
-      try {
-        await liff.init({ liffId: MY_LIFF_ID });
+    let loadedShareMessage = null;
 
-        if (!liff.isInClient()) {
-          showDebugError("請在手機 LINE 內開啟，外部瀏覽器無法直接轉發卡片給好友。");
-          return;
-        }
-
+    // 1. 初始化 LIFF SDK
+    liff.init({ liffId: LIFF_ID })
+      .then(async () => {
         if (!liff.isLoggedIn()) {
           liff.login();
           return;
         }
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const category = urlParams.get("cat") || "熱門特惠";
-        const salesCode = urlParams.get("code") || "DEFAULT";
-
-        const fetchUrl = `${GAS_API_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(salesCode)}`;
-        const response = await fetch(fetchUrl);
-        const resJson = await response.json();
-
-        if (resJson.status !== "success" || !resJson.data || resJson.data.length === 0) {
-          throw new Error("無法取得書籍資料，請稍後重試。");
+        // 若網址未帶 uid，從 LIFF profile 動態補足發送者 ID
+        if (!urlUserId) {
+          try {
+            const profile = await liff.getProfile();
+            urlUserId = profile.userId || '';
+          } catch (e) {}
         }
 
-        // 組裝標準 Flex Carousel 訊息本體
-        cachedFlexMessage = {
-          type: "flex",
-          altText: `📚 好友為您推薦【${category}】精選好書清單！`,
-          contents: {
-            type: "carousel",
-            contents: resJson.data
-          }
-        };
+        if (liff.isApiAvailable('shareTargetPicker')) {
+          shareBtn.innerText = "正在組裝精選書單...";
+          statusText.innerText = "為您同步推薦書單內容中...";
 
-        // 畫面就緒
-        document.getElementById("spinner").style.display = "none";
-        document.getElementById("headerIcon").style.display = "block";
-        updateStatus(`【${category}】精選好書`, "專屬書單已準備完成！點擊下方按鈕即可挑選好友或群組分享。");
-        document.getElementById("shareBtn").style.display = "block";
-
-      } catch (err) {
-        showDebugError("初始化中斷：" + (err.message || JSON.stringify(err)));
-      }
-    }
-
-    async function handleShareClick() {
-      if (!cachedFlexMessage) return;
-
-      const btn = document.getElementById("shareBtn");
-      btn.disabled = true;
-      btn.innerText = "正在開啟好友選單...";
-
-      try {
-        if (!liff.isApiAvailable("shareTargetPicker")) {
-          throw new Error("此環境不支援 ShareTargetPicker，請確認 LINE App 是否更新至最新版。");
-        }
-
-        // 開啟原生選擇好友視窗，將整份 Flex Carousel 傳送出去
-        const res = await liff.shareTargetPicker([cachedFlexMessage]);
-        if (res) {
-          updateStatus("發送成功！", "推薦書單已順利轉發給好友！視窗即將關閉...");
-          btn.style.display = "none";
-          setTimeout(() => liff.closeWindow(), 1200);
+          // 動態載入與發送者聊天室一模一樣的完整 Flex Carousel
+          loadExactCarouselMessage();
         } else {
-          btn.disabled = false;
-          btn.innerText = "挑選好友／群組發送推薦書單";
-          updateStatus("未發送", "您已取消選擇，隨時可再次點擊分享。");
+          statusText.innerText = "目前環境不支援 LINE 分享功能";
         }
-      } catch (error) {
-        btn.disabled = false;
-        btn.innerText = "重新嘗試發送";
-        showDebugError("發送失敗：" + (error.message || JSON.stringify(error)));
+      })
+      .catch((err) => {
+        statusText.innerText = "LIFF 初始化失敗: " + err.message;
+      });
+
+    // 動態向後端 API 取得該組書單（依據 bids 或 cat）
+    function loadExactCarouselMessage() {
+      if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("YOUR_GAS_ID_HERE")) {
+        loadedShareMessage = buildFallbackFlexMessage();
+        readyToShare();
+        return;
       }
+
+      const apiUrl = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&bids=${encodeURIComponent(bidsParam)}`;
+
+      fetch(apiUrl)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData && resData.status === "success" && Array.isArray(resData.data) && resData.data.length > 0) {
+            loadedShareMessage = {
+              type: "flex",
+              altText: `阿財店員推薦【${category}】精選好書`,
+              contents: {
+                type: "carousel",
+                contents: resData.data
+              }
+            };
+          } else {
+            loadedShareMessage = buildFallbackFlexMessage();
+          }
+          readyToShare();
+        })
+        .catch(err => {
+          console.warn("載入即時書單異常，使用備份版面:", err);
+          loadedShareMessage = buildFallbackFlexMessage();
+          readyToShare();
+        });
     }
 
-    main();
+    function readyToShare() {
+      shareBtn.disabled = false;
+      shareBtn.innerText = "挑選好友立即分享";
+      statusText.innerText = "點選按鈕挑選好友即可發送！";
+    }
+
+    // 備份單張卡片（僅在無法連線後端時兜底）
+    function buildFallbackFlexMessage() {
+      return {
+        type: "flex",
+        altText: `好友向您推薦了【${category}】精選好書！`,
+        contents: {
+          type: "bubble",
+          size: "kilo",
+          hero: {
+            type: "image",
+            url: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500",
+            size: "full",
+            aspectRatio: "16:9",
+            aspectMode: "cover"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            spacing: "sm",
+            paddingAll: "15px",
+            contents: [
+              {
+                type: "text",
+                text: "🎁 好友贈書推薦",
+                weight: "bold",
+                size: "md",
+                color: "#2C3E50"
+              },
+              {
+                type: "text",
+                text: `哈囉！您的好友正在春水小鎮書店挑選【${category}】特惠好書，特別為您送上專屬書單！`,
+                size: "xs",
+                color: "#666666",
+                wrap: true
+              },
+              {
+                type: "text",
+                text: `專屬推薦碼：${promoCode}`,
+                size: "xxs",
+                color: "#999999",
+                margin: "xs"
+              }
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            paddingAll: "10px",
+            contents: [
+              {
+                type: "button",
+                style: "primary",
+                color: "#06C755",
+                height: "sm",
+                action: {
+                  type: "uri",
+                  label: "登入領取好書",
+                  uri: `https://www.hamibook.com.tw?sales_code=${encodeURIComponent(promoCode)}`
+                }
+              }
+            ]
+          }
+        }
+      };
+    }
+
+    // 2. 點擊分享事件
+    shareBtn.addEventListener('click', () => {
+      shareBtn.disabled = true;
+      statusText.innerText = "開啟分享面板中...";
+
+      const messageToSend = loadedShareMessage || buildFallbackFlexMessage();
+
+      // 調用 LINE 分享挑選器
+      liff.shareTargetPicker([messageToSend])
+        .then((res) => {
+          if (res) {
+            statusText.innerText = "✅ 分享成功！正在記錄推薦數據...";
+            // 雙重身分打點：確保非同步發送完成再關閉視窗
+            reportShareSuccessToGAS(promoCode, urlUserId);
+          } else {
+            shareBtn.disabled = false;
+            statusText.innerText = "已取消分享";
+          }
+        })
+        .catch((err) => {
+          shareBtn.disabled = false;
+          statusText.innerText = "分享失敗：" + err.message;
+        });
+    });
+
+    // 3. 向 GAS 後端回報累加分享次數（附帶 userId 與 promoCode，確保數據 +1）
+    function reportShareSuccessToGAS(code, uid) {
+      if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("YOUR_GAS_ID_HERE")) {
+        console.warn("未設定有效的 GAS_WEBAPP_URL");
+        liff.closeWindow();
+        return;
+      }
+
+      const reportUrl = `${GAS_WEBAPP_URL}?action=record_share&code=${encodeURIComponent(code)}&userId=${encodeURIComponent(uid)}`;
+
+      // 優先使用 navigator.sendBeacon 保證背景打點必達
+      let beaconSent = false;
+      if (navigator.sendBeacon) {
+        try {
+          beaconSent = navigator.sendBeacon(reportUrl);
+        } catch (e) {}
+      }
+
+      if (beaconSent) {
+        setTimeout(() => { liff.closeWindow(); }, 200);
+      } else {
+        // 退水使用 fetch 等待回應
+        fetch(reportUrl, { method: "GET", mode: "no-cors" })
+          .then(() => {
+            setTimeout(() => { liff.closeWindow(); }, 300);
+          })
+          .catch(() => {
+            liff.closeWindow();
+          });
+      }
+    }
   </script>
 </body>
 </html>
