@@ -111,17 +111,18 @@
   </div>
 
   <script>
-    const LIFF_ID = "2012185997-sJenhi1M";
+    const LIFF_ID = "2012185997-sJenhi1M"; 
+    // 請確認為目前的 GAS Web App URL（/exec 結尾）
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec";
 
     const urlParams = new URLSearchParams(window.location.search);
-    const category = urlParams.get('cat') || 'Hami書城好書推薦';
-    const promoCode = urlParams.get('code') || '';
-    let urlUserId = urlParams.get('uid') || '';
-    const bidsParam = urlParams.get('bids') || '';
+    const category = (urlParams.get('cat') || '精選特惠').replace(/[🔥⏳📚]/g, '').trim();
+    const promoCode = (urlParams.get('code') || '').trim();
+    let urlUserId = (urlParams.get('uid') || '').trim();
+    const bidsParam = (urlParams.get('bids') || '').trim();
 
-    // 介面僅呈現分類與代碼，絕不顯示 userId
-    document.getElementById('displayCat').innerText = category;
+    // 介面渲染（不顯示 userId）
+    document.getElementById('displayCat').innerText = category || "熱門好書";
     document.getElementById('displayCode').innerText = promoCode ? promoCode : "官方精選";
 
     const shareBtn = document.getElementById('shareBtn');
@@ -143,7 +144,7 @@
           } catch (e) {}
         }
 
-        // 點擊開啟 LIFF 瞬間立即記錄分享次數 +1
+        // 點擊呼叫即計數打點
         triggerShareCountIncrement(promoCode, urlUserId);
 
         if (!liff.isApiAvailable('shareTargetPicker')) {
@@ -154,7 +155,8 @@
         shareBtn.innerText = "正在組裝精選書單...";
         statusText.innerText = "同步推薦書籍中...";
 
-        fetchExactCarousel();
+        // 使用 JSONP 取得後端包含尾卡的完整 Carousel
+        loadCarouselViaJSONP();
       })
       .catch((err) => {
         statusText.innerText = "初始化失敗: " + err.message;
@@ -166,59 +168,52 @@
       if (navigator.sendBeacon) {
         navigator.sendBeacon(countUrl);
       } else {
-        fetch(countUrl, { method: "GET", mode: "no-cors" });
+        const img = new Image();
+        img.src = countUrl;
       }
     }
 
-    // 取得嚴格符合 LINE 官方驗證的書單 Flex
-    function fetchExactCarousel() {
-      const apiUrl = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&userId=${encodeURIComponent(urlUserId)}&bids=${encodeURIComponent(bidsParam)}`;
-
-      fetch(apiUrl)
-        .then(res => res.json())
-        .then(resData => {
-          if (resData && resData.status === "success" && resData.data && resData.data.contents) {
-            // 清洗資料，確保所有圖片網址符合 HTTPS 規定
-            sanitizeFlexPayload(resData.data);
-            flexMessagePayload = resData.data;
-            readyToShare();
-          } else {
-            fallbackToSingleCard();
-          }
-        })
-        .catch(err => {
-          console.warn("無法取得完整書單，使用備份卡片:", err);
-          fallbackToSingleCard();
-        });
-    }
-
-    // 確保每張泡泡內所有 uri 與圖片完全合規，避免被 LINE 靜默拒發
-    function sanitizeFlexPayload(flex) {
-      if (flex.contents && flex.contents.contents && Array.isArray(flex.contents.contents)) {
-        flex.contents.contents.forEach(bubble => {
-          if (bubble.hero && bubble.hero.url) {
-            if (!bubble.hero.url.startsWith("https://")) {
-              bubble.hero.url = "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500";
-            }
-          }
-        });
+    // JSONP 回呼處理函式
+    window.handleBookCarouselResponse = function(response) {
+      if (response && response.status === "success" && response.data) {
+        flexMessagePayload = response.data;
+        shareBtn.disabled = false;
+        shareBtn.innerText = "挑選好友立即分享";
+        statusText.innerText = "書單已就緒！點擊按鈕即可挑選好友發送。";
+      } else {
+        fallbackToSingleCard();
       }
+    };
+
+    function loadCarouselViaJSONP() {
+      if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("YOUR_GAS_ID_HERE") || !bidsParam) {
+        fallbackToSingleCard();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&userId=${encodeURIComponent(urlUserId)}&bids=${encodeURIComponent(bidsParam)}&callback=handleBookCarouselResponse`;
+      script.onerror = function() {
+        console.warn("JSONP 請求失敗，改用備用卡片");
+        fallbackToSingleCard();
+      };
+      document.body.appendChild(script);
     }
 
     function fallbackToSingleCard() {
-      const targetUrl = promoCode 
-        ? `https://www.hamibook.com.tw?sales_code=${encodeURIComponent(promoCode)}` 
-        : "https://www.hamibook.com.tw";
+      const readingUrl = promoCode 
+        ? `https://www.hamibook.com.tw/TopRanks/151?sales_code=${encodeURIComponent(promoCode)}` 
+        : "https://www.hamibook.com.tw/TopRanks/151";
 
       flexMessagePayload = {
         type: "flex",
-        altText: `好友向您推薦了【${category}】精選好書`,
+        altText: `好友向您推薦了【${category}】精選好書！`,
         contents: {
           type: "bubble",
           size: "kilo",
           hero: {
             type: "image",
-            url: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500",
+            url: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&auto=format&fit=crop",
             size: "full",
             aspectRatio: "16:9",
             aspectMode: "cover"
@@ -227,28 +222,16 @@
             type: "box",
             layout: "vertical",
             spacing: "sm",
-            paddingAll: "15px",
+            paddingAll: "16px",
             contents: [
-              {
-                type: "text",
-                text: "🎁 好友特惠書單推薦",
-                weight: "bold",
-                size: "md",
-                color: "#2C3E50"
-              },
-              {
-                type: "text",
-                text: `您的好友正在挑選【${category}】精選好書，邀您一同閱讀！`,
-                size: "xs",
-                color: "#666666",
-                wrap: true
-              }
+              { type: "text", text: "🎁 好友贈書推薦", weight: "bold", size: "md", color: "#2C3E50" },
+              { type: "text", text: `您的好友特別挑選了【${category}】的精選好書，邀請你前往 Hami書城 查看更多精采好書！`, size: "xs", color: "#666666", wrap: true }
             ]
           },
           footer: {
             type: "box",
             layout: "vertical",
-            paddingAll: "10px",
+            paddingAll: "12px",
             contents: [
               {
                 type: "button",
@@ -257,34 +240,31 @@
                 height: "sm",
                 action: {
                   type: "uri",
-                  label: "登入領取好書",
-                  uri: targetUrl
+                  label: "立即前往熱搜推薦榜",
+                  uri: readingUrl
                 }
               }
             ]
           }
         }
       };
-      readyToShare();
-    }
 
-    function readyToShare() {
       shareBtn.disabled = false;
       shareBtn.innerText = "挑選好友立即分享";
       statusText.innerText = "書單已就緒！點擊按鈕即可挑選好友發送。";
     }
 
+    // 點擊挑選好友發送
     shareBtn.addEventListener('click', () => {
       if (!flexMessagePayload) return;
       shareBtn.disabled = true;
       statusText.innerText = "開啟挑選面板中...";
 
-      // 嚴格保證 shareTargetPicker 接收的是標準陣列
       liff.shareTargetPicker([flexMessagePayload])
         .then((res) => {
           if (res) {
-            statusText.innerText = "✅ 分享完成！視窗即將關閉...";
-            setTimeout(() => { liff.closeWindow(); }, 600);
+            statusText.innerText = "✅ 分享成功！即將關閉視窗...";
+            setTimeout(() => { liff.closeWindow(); }, 500);
           } else {
             shareBtn.disabled = false;
             statusText.innerText = "已取消分享";
@@ -292,7 +272,7 @@
         })
         .catch((err) => {
           shareBtn.disabled = false;
-          statusText.innerText = "分享未成功：" + err.message;
+          statusText.innerText = "發送未完成：" + err.message;
         });
     });
   </script>
