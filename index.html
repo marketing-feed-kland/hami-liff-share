@@ -126,7 +126,7 @@
     const statusText = document.getElementById('statusText');
 
     let flexMessagePayload = null;
-    let countCompletion = Promise.resolve();
+    let countCompletion = Promise.resolve(false);
 
     liff.init({ liffId: LIFF_ID })
       .then(async () => {
@@ -141,9 +141,6 @@
           liff.login({ redirectUri: window.location.href });
           return;
         }
-
-        // 記錄開啟分享入口。好友挑選成功/取消均不再加次數。
-        triggerShareCountIncrement(promoCode);
 
         if (!liff.isApiAvailable('shareTargetPicker')) {
           statusText.innerText = "目前環境未開放好友挑選功能";
@@ -175,12 +172,12 @@
       const script = document.createElement('script');
       const callback = 'shareCount_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
       let settled = false;
-      const finish = (message) => {
+      const finish = (message, counted = false) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         countStatus.innerText = message;
-        resolveCount();
+        resolveCount(counted);
         script.remove();
         // 保留空函式，避免逾時後延遲抵達的 callback 造成例外。
         window[callback] = () => {};
@@ -188,17 +185,17 @@
       const timer = setTimeout(() => finish("分享次數確認逾時，請查閱會員清單；本頁不會自動重送。"), 20000);
       window[callback] = (result) => {
         const messages = {
-          ok: "本次開啟已記錄，分享次數 +1。",
+          ok: "本次成功分享已記錄，分享次數 +1。",
           missing_code: "缺少有效推廣碼，未計次。",
           not_found: "找不到此推廣碼的員工，未計次。",
           ambiguous_code: "推廣碼對應多位員工，未計次，請聯絡管理員。",
           busy: "計次服務忙碌，未計次。",
           error: "計次發生錯誤，請聯絡管理員查看執行紀錄。"
         };
-        finish(messages[result && result.status] || "計次回應格式不符，請確認部署版本。");
+        finish(messages[result && result.status] || "計次回應格式不符，請確認部署版本。", Boolean(result && result.status === "ok"));
       };
       script.onerror = () => finish("無法確認分享計次，請查閱會員清單與 GAS 部署設定。");
-      script.src = GAS_WEBAPP_URL + '?action=open_share&code=' + encodeURIComponent(code)
+      script.src = GAS_WEBAPP_URL + '?action=record_share&code=' + encodeURIComponent(code)
         + '&callback=' + callback + '&t=' + Date.now();
       document.body.appendChild(script);
     }
@@ -212,6 +209,8 @@
         .then(resData => {
           if (resData && resData.status === "success" && resData.data) {
             applyCarouselPayload(resData.data);
+          } else if (resData && resData.status === "error") {
+            showBookLoadError();
           } else {
             loadCarouselViaJSONP();
           }
@@ -226,9 +225,16 @@
       if (response && response.status === "success" && response.data) {
         applyCarouselPayload(response.data);
       } else {
-        fallbackToSingleCard();
+        showBookLoadError();
       }
     };
+
+    function showBookLoadError() {
+      flexMessagePayload = null;
+      shareBtn.disabled = true;
+      shareBtn.innerText = "書單暫時無法分享";
+      statusText.innerText = "原推薦書籍目前無法取得，請回到聊天室重新索取書單。";
+    }
 
     function loadCarouselViaJSONP() {
       const script = document.createElement('script');
@@ -271,7 +277,7 @@
             spacing: "sm",
             paddingAll: "16px",
             contents: [
-              { type: "text", text: "🎁 好友贈書推薦", weight: "bold", size: "md", color: "#2C3E50" },
+              { type: "text", text: "🎁 好友推薦你讀", weight: "bold", size: "md", color: "#2C3E50" },
               { type: "text", text: `您的好友特別挑選了【${category}】的精選好書，邀請你前往 Hami書城 查看更多精采好書！`, size: "xs", color: "#666666", wrap: true }
             ]
           },
@@ -312,23 +318,27 @@
 
       try {
         const res = await liff.shareTargetPicker([flexMessagePayload]);
-        if (res) {
+        if (res && res.status === "success") {
           // 發送成功
           statusText.innerText = "✅ 已成功分享給好友！";
-          await countCompletion;
-          setTimeout(() => {
-            if (liff.isInClient()) liff.closeWindow();
-          }, 800);
+          shareBtn.innerText = "已完成分享";
+          triggerShareCountIncrement(promoCode);
+          const counted = await countCompletion;
+          if (counted) {
+            setTimeout(() => {
+              if (liff.isInClient()) liff.closeWindow();
+            }, 800);
+          }
         } else {
-          // 使用者在挑選面板按下「取消」
+          // 空物件或無明確 success 的舊版回傳，不能證明訊息已送出，因此不計次。
           shareBtn.disabled = false;
-          statusText.innerText = "已取消分享";
+          statusText.innerText = res ? "LINE 未提供明確成功回報，本次未計次；請更新 LINE 後重試。" : "已取消分享，本次未計次。";
         }
       } catch (err) {
         console.error("shareTargetPicker 失敗:", err);
         shareBtn.disabled = false;
         statusText.innerText = "發送未完成：" + err.message;
-        alert("發送未完成：" + err.message);
+
       }
     });
   </script>
