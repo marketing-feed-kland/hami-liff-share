@@ -2,10 +2,12 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>好書相報 - 春水小鎮阿財店員</title>
-  <!-- 引入 LINE LIFF SDK -->
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -14,419 +16,252 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
     body {
-      background-color: #f5f6f8;
+      background-color: #f7f9fa;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      padding: 16px;
+      padding: 20px;
     }
     .card {
       background: #ffffff;
       border-radius: 16px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-      width: 100%;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       max-width: 400px;
-      padding: 32px 24px;
+      width: 100%;
+      padding: 28px 24px;
       text-align: center;
     }
-    .gift-icon {
-      font-size: 56px;
-      line-height: 1;
-      margin-bottom: 16px;
-    }
-    .title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #1a202c;
+    .icon {
+      font-size: 54px;
       margin-bottom: 12px;
     }
-    .desc {
+    h2 {
+      font-size: 20px;
+      color: #2c3e50;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+    p {
       font-size: 14px;
-      color: #718096;
+      color: #666666;
       line-height: 1.6;
       margin-bottom: 24px;
     }
     .info-box {
-      background-color: #f7fafc;
-      border: 1px solid #edf2f7;
-      border-radius: 12px;
-      padding: 16px;
-      text-align: left;
+      background-color: #f0f4f8;
+      border-radius: 8px;
+      padding: 12px;
       margin-bottom: 24px;
+      font-size: 13px;
+      color: #34495e;
+      text-align: left;
     }
     .info-item {
-      font-size: 14px;
-      color: #4a5568;
-      line-height: 1.8;
-      word-break: break-all;
+      margin-bottom: 4px;
     }
-    .info-label {
-      font-weight: 600;
-      color: #2d3748;
+    .info-item:last-child {
+      margin-bottom: 0;
     }
     .btn {
+      display: block;
       width: 100%;
-      background-color: #00c300;
+      background-color: #06c755;
       color: #ffffff;
       border: none;
       border-radius: 10px;
-      padding: 14px;
+      padding: 14px 0;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: background-color 0.2s, opacity 0.2s;
-    }
-    .btn:disabled {
-      background-color: #cbd5e0 !important;
-      cursor: not-allowed;
+      box-shadow: 0 4px 12px rgba(6, 199, 85, 0.25);
+      transition: background 0.2s, transform 0.1s;
     }
     .btn:active {
-      background-color: #00a000;
+      transform: scale(0.98);
+      background-color: #05a847;
     }
-    .subtext {
+    .btn:disabled {
+      background-color: #cccccc;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    .status-msg {
       margin-top: 14px;
-      font-size: 12px;
-      color: #a0aec0;
-      min-height: 16px;
-      word-break: break-word;
-    }
-    .subtext.error {
-      color: #e53e3e;
+      font-size: 13px;
+      color: #888888;
+      min-height: 20px;
     }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <div class="gift-icon">🎁</div>
-    <div class="title">好書相報轉分享</div>
-    <div class="desc">
-      邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。
-    </div>
+    <div class="icon">🎁</div>
+    <h2>好書相報轉分享</h2>
+    <p>邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。</p>
 
     <div class="info-box">
-      <div class="info-item">
-        <span class="info-label">📚 分享主題：</span>
-        <span id="topicDisplay">載入中...</span>
-      </div>
-      <div class="info-item">
-        <span id="refDisplay" class="info-label" style="color: #2b6cb0;"></span>
-      </div>
+      <div class="info-item">📚 <strong>分享主題：</strong><span id="displayCat">讀取中...</span></div>
+      <div class="info-item">🏷️ <strong>專屬推薦碼：</strong><span id="displayCode">讀取中...</span></div>
     </div>
 
-    <button id="shareBtn" class="btn" disabled>連線檢查中...</button>
-    <div id="subtext" class="subtext">正在初始化 LINE 服務...</div>
+    <button id="shareBtn" class="btn" disabled>初始化中...</button>
+    <div id="statusText" class="status-msg">正在載入 LINE 環境...</div>
   </div>
 
   <script>
-    // ========== 1. 核心參數設定 ==========
     const LIFF_ID = "2012185997-sJenhi1M";
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec";
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec";
 
-    let topicName = "精選好書推薦";
-    let refCode = "";
-    let bookList = [];
-    let isSubmitting = false;
+    const urlParams = new URLSearchParams(window.location.search);
+    const category = urlParams.get('cat') || '精選特惠';
+    const promoCode = urlParams.get('code') || '';
+    let urlUserId = urlParams.get('uid') || '';
+    const bidsParam = urlParams.get('bids') || '';
 
-    // ========== 2. 解析 URL 參數並即時填入畫面 ==========
-    (function parseAndFillImmediately() {
-      try {
-        const params = new URLSearchParams(window.location.search);
+    document.getElementById('displayCat').innerText = category;
+    document.getElementById('displayCode').innerText = promoCode || "（未綁定）";
 
-        const rawTopic = params.get('topic');
-        if (rawTopic && !rawTopic.startsWith('U')) {
-          topicName = decodeURIComponent(rawTopic);
-        }
+    const shareBtn = document.getElementById('shareBtn');
+    const statusText = document.getElementById('statusText');
 
-        refCode = params.get('ref') || "";
+    let flexMessagePayload = null;
 
-        const booksParam = params.get('books');
-        if (booksParam) {
-          const rawItems = booksParam.split(',');
-          bookList = rawItems.map(item => {
-            const parts = decodeURIComponent(item).split('|');
-            return {
-              title: parts[0] ? parts[0].trim() : "精選書籍",
-              salePrice: parts[1] ? parts[1].trim() : "",
-              origPrice: parts[2] ? parts[2].trim() : "",
-              imageUrl: parts[3] ? parts[3].trim() : "https://placehold.co/300x400?text=Book",
-              bookUrl: parts[4] ? parts[4].trim() : ""
-            };
-          }).filter(b => b.title !== "");
-        }
-
-        document.getElementById('topicDisplay').textContent = topicName;
-
-        const refDisplayEl = document.getElementById('refDisplay');
-        if (refCode) {
-          refDisplayEl.textContent = `🎁 來自Hami書城(${refCode})的推薦`;
-        } else {
-          refDisplayEl.textContent = `🎁 來自Hami書城的推薦`;
-        }
-
-      } catch (e) {
-        console.error("參數解析失敗：", e);
-      }
-    })();
-
-    // ========== 3. LIFF 環境初始化與按鈕狀態控管 ==========
-    window.onload = async function() {
-      const shareBtn = document.getElementById("shareBtn");
-      const subtext = document.getElementById("subtext");
-
-      try {
-        await liff.init({ liffId: LIFF_ID });
-
-        // 未登入狀況導引
+    liff.init({ liffId: LIFF_ID })
+      .then(async () => {
         if (!liff.isLoggedIn()) {
-          shareBtn.textContent = "請登入 LINE";
-          shareBtn.disabled = false;
-          shareBtn.onclick = () => liff.login();
-          subtext.textContent = "需登入 LINE 帳號以啟用好友分享";
+          liff.login();
           return;
         }
 
-        // 檢查環境是否支援 shareTargetPicker
-        if (!liff.isApiAvailable("shareTargetPicker")) {
-          shareBtn.textContent = "請於手機 LINE 開啟";
-          shareBtn.disabled = true;
-          subtext.className = "subtext error";
-          subtext.textContent = "環境未支援轉發，或後台未開啟 Share Target Picker 權限。";
+        if (!urlUserId) {
+          try {
+            const profile = await liff.getProfile();
+            urlUserId = profile.userId || '';
+          } catch (e) {}
+        }
+
+        // 核心改變：進入頁面即立刻發送「分享次數 +1」打點
+        triggerShareCountIncrement(promoCode, urlUserId);
+
+        if (!liff.isApiAvailable('shareTargetPicker')) {
+          statusText.innerText = "目前環境未開放好友挑選功能";
           return;
         }
 
-        // 書單參數缺失提示
-        if (bookList.length === 0) {
-          shareBtn.textContent = "查無待分享書單";
-          shareBtn.disabled = true;
-          subtext.textContent = "未接收到待轉發的書籍清單";
-          return;
-        }
+        shareBtn.innerText = "正在組裝精選書單...";
+        statusText.innerText = "同步推薦書籍中...";
 
-        // 正常啟用
-        shareBtn.textContent = "挑選好友立即分享";
-        shareBtn.disabled = false;
-        subtext.className = "subtext";
-        subtext.textContent = "點選按鈕挑選好友即可發送！";
+        // 向 GAS 後端取得完全符合 LINE 規範的 Flex Carousel
+        fetchExactCarousel();
+      })
+      .catch((err) => {
+        statusText.innerText = "初始化失敗: " + err.message;
+      });
 
-      } catch (err) {
-        console.error("LIFF 載入失敗：", err);
-        shareBtn.textContent = "系統初始化失敗";
-        shareBtn.disabled = true;
-        subtext.className = "subtext error";
-        subtext.textContent = `錯誤碼：${err.code || "INIT_FAIL"}（${err.message || err}）`;
+    // 即時打點（點擊呼叫即計數）
+    function triggerShareCountIncrement(code, uid) {
+      if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("YOUR_GAS_ID_HERE")) return;
+      const countUrl = `${GAS_WEBAPP_URL}?action=record_share&code=${encodeURIComponent(code)}&userId=${encodeURIComponent(uid)}`;
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(countUrl);
+      } else {
+        fetch(countUrl, { method: "GET", mode: "no-cors" });
       }
+    }
 
-      setupEventListeners();
-    };
+    // 取得官方結構 Flex
+    function fetchExactCarousel() {
+      const apiUrl = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&userId=${encodeURIComponent(urlUserId)}&bids=${encodeURIComponent(bidsParam)}`;
 
-    // ========== 4. 組裝 Flex Message ==========
-    function buildBookFlexMessage() {
-      if (bookList.length === 0) return null;
+      fetch(apiUrl)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData && resData.status === "success" && resData.data) {
+            flexMessagePayload = resData.data;
+            shareBtn.disabled = false;
+            shareBtn.innerText = "挑選好友立即分享";
+            statusText.innerText = "已就緒！點擊按鈕即可挑選好友發送。";
+          } else {
+            fallbackToSingleCard();
+          }
+        })
+        .catch(err => {
+          console.warn("無法取得完整書單，使用備份卡片", err);
+          fallbackToSingleCard();
+        });
+    }
 
-      const bookBubbles = bookList.map(book => {
-        const priceContents = [];
-        if (book.salePrice) {
-          priceContents.push({
-            type: "text",
-            text: book.salePrice,
-            color: "#e53e3e",
-            size: "sm",
-            weight: "bold",
-            flex: 0
-          });
-        }
-        if (book.origPrice) {
-          priceContents.push({
-            type: "text",
-            text: book.origPrice,
-            color: "#aaaaaa",
-            size: "xxs",
-            decoration: "line-through",
-            margin: "sm"
-          });
-        }
-
-        return {
+    function fallbackToSingleCard() {
+      flexMessagePayload = {
+        type: "flex",
+        altText: `好友向您推薦了【${category}】精選好書`,
+        contents: {
           type: "bubble",
-          size: "micro",
           hero: {
             type: "image",
-            url: book.imageUrl,
+            url: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500",
             size: "full",
-            aspectMode: "cover",
-            aspectRatio: "3:4"
+            aspectRatio: "16:9",
+            aspectMode: "cover"
           },
           body: {
             type: "box",
             layout: "vertical",
             spacing: "sm",
-            paddingAll: "10px",
+            paddingAll: "15px",
             contents: [
-              {
-                type: "text",
-                text: book.title,
-                weight: "bold",
-                size: "sm",
-                wrap: true,
-                maxLines: 2
-              },
-              ...(priceContents.length > 0 ? [{
-                type: "box",
-                layout: "baseline",
-                contents: priceContents
-              }] : [])
+              { type: "text", text: "🎁 好友特惠書單推薦", weight: "bold", size: "md", color: "#2C3E50" },
+              { type: "text", text: `您的好友正在春水小鎮書店挑選【${category}】特惠好書，邀您一同閱讀！`, size: "xs", color: "#666666", wrap: true }
             ]
           },
           footer: {
             type: "box",
             layout: "vertical",
-            paddingAll: "8px",
+            paddingAll: "10px",
             contents: [
               {
                 type: "button",
                 style: "primary",
-                color: "#00c300",
+                color: "#06C755",
                 height: "sm",
                 action: {
                   type: "uri",
-                  label: "登入領取好書",
-                  uri: book.bookUrl || `https://liff.line.me/${LIFF_ID}?ref=${refCode}`
+                  label: "前往探索好書",
+                  uri: promoCode ? `https://www.hamibook.com.tw?sales_code=${encodeURIComponent(promoCode)}` : "https://www.hamibook.com.tw"
                 }
               }
             ]
           }
-        };
-      });
-
-      const booksParamString = bookList.map(b => 
-        `${b.title}|${b.salePrice}|${b.origPrice}|${b.imageUrl}|${b.bookUrl}`
-      ).join(",");
-
-      const chainShareUrl = `https://liff.line.me/${LIFF_ID}?topic=${encodeURIComponent(topicName)}&ref=${encodeURIComponent(refCode)}&books=${encodeURIComponent(booksParamString)}`;
-
-      const shareActionBubble = {
-        type: "bubble",
-        size: "micro",
-        body: {
-          type: "box",
-          layout: "vertical",
-          spacing: "md",
-          justifyContent: "center",
-          alignItems: "center",
-          paddingAll: "14px",
-          contents: [
-            {
-              type: "text",
-              text: "🎁",
-              size: "xxl",
-              align: "center"
-            },
-            {
-              type: "text",
-              text: "好書相報轉分享",
-              weight: "bold",
-              size: "md",
-              align: "center",
-              wrap: true
-            },
-            {
-              type: "text",
-              text: "挑選 LINE 好友或群組\n轉發這組精選好書",
-              size: "xxs",
-              color: "#888888",
-              align: "center",
-              wrap: true
-            }
-          ]
-        },
-        footer: {
-          type: "box",
-          layout: "vertical",
-          paddingAll: "8px",
-          contents: [
-            {
-              type: "button",
-              style: "primary",
-              color: "#00c300",
-              height: "sm",
-              action: {
-                type: "uri",
-                label: "好書相報轉分享",
-                uri: chainShareUrl
-              }
-            }
-          ]
         }
       };
-
-      return {
-        type: "flex",
-        altText: `好友贈書推薦：${topicName}`,
-        contents: {
-          type: "carousel",
-          contents: [...bookBubbles, shareActionBubble]
-        }
-      };
+      shareBtn.disabled = false;
+      shareBtn.innerText = "挑選好友立即分享";
+      statusText.innerText = "已就緒！點擊按鈕即可挑選好友發送。";
     }
 
-    // ========== 5. 綁定按鈕點擊與發送流程 ==========
-    function setupEventListeners() {
-      const shareBtn = document.getElementById("shareBtn");
-      if (!shareBtn) return;
+    shareBtn.addEventListener('click', () => {
+      if (!flexMessagePayload) return;
+      shareBtn.disabled = true;
+      statusText.innerText = "開啟挑選面板中...";
 
-      shareBtn.addEventListener("click", async () => {
-        if (isSubmitting || bookList.length === 0) return;
-
-        if (!liff.isApiAvailable("shareTargetPicker")) {
-          alert("目前環境不支援挑選好友功能，請確認 LINE 應用程式已更新或後台已啟用該權限。");
-          return;
-        }
-
-        try {
-          const flexContent = buildBookFlexMessage();
-          if (!flexContent) return;
-
-          const res = await liff.shareTargetPicker([flexContent]);
-
+      // 嚴格依照 LINE 官方規範以陣列包裹單一 flex 物件傳入
+      liff.shareTargetPicker([flexMessagePayload])
+        .then((res) => {
           if (res) {
-            isSubmitting = true;
-            shareBtn.textContent = "紀錄中...";
-            shareBtn.disabled = true;
-
-            await sendShareRecordToGas();
-
-            alert("分享成功！推薦次數已累計。");
-            liff.closeWindow();
-          }
-        } catch (err) {
-          console.error("分享流程發生錯誤：", err);
-          alert("分享發生錯誤，請稍後再試。");
-        } finally {
-          isSubmitting = false;
-          if (shareBtn && bookList.length > 0) {
-            shareBtn.textContent = "挑選好友立即分享";
+            statusText.innerText = "✅ 分享完成！視窗即將關閉...";
+            setTimeout(() => { liff.closeWindow(); }, 500);
+          } else {
             shareBtn.disabled = false;
+            statusText.innerText = "已取消分享";
           }
-        }
-      });
-    }
-
-    // ========== 6. 呼叫 GAS Web App ==========
-    async function sendShareRecordToGas() {
-      try {
-        const token = liff.getAccessToken();
-        if (!token) return;
-
-        const url = `${GAS_API_URL}?action=incrementShare&token=${encodeURIComponent(token)}&refCode=${encodeURIComponent(refCode)}&topic=${encodeURIComponent(topicName)}&bookCount=${bookList.length}&_t=${Date.now()}`;
-
-        await fetch(url, { method: "GET", mode: "no-cors" });
-        console.log("次數已累計");
-      } catch (err) {
-        console.error("累計發送失敗：", err);
-      }
-    }
+        })
+        .catch((err) => {
+          shareBtn.disabled = false;
+          statusText.innerText = "分享未成功：" + err.message;
+        });
+    });
   </script>
 </body>
 </html>
