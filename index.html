@@ -155,15 +155,17 @@
         statusText.innerText = "初始化失敗: " + err.message;
       });
 
+    // 穿透 302 轉址與 CORS 的精確打點函式
     function triggerShareCountIncrement(code) {
       if (!GAS_WEBAPP_URL || !code) return;
-      const countUrl = `${GAS_WEBAPP_URL}?action=record_share&code=${encodeURIComponent(code)}`;
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(countUrl);
-      } else {
-        const img = new Image();
-        img.src = countUrl;
-      }
+      
+      const countUrl = GAS_WEBAPP_URL + 
+        "?action=record_share" + 
+        "&code=" + encodeURIComponent(code) + 
+        "&t=" + new Date().getTime(); // 防止手機快取
+
+      const tracker = new Image();
+      tracker.src = countUrl;
     }
 
     // 核心資料取得邏輯：優先以 fetch 讀取，成功即組裝 Carousel
