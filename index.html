@@ -114,30 +114,35 @@
     const LIFF_ID = "2012185997-sJenhi1M"; 
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec";
 
-    const urlParams = new URLSearchParams(window.location.search);
-    let category = (urlParams.get('cat') || '精選好書').replace(/[🔥⏳📚\s]/g, '').trim();
-    let promoCode = (urlParams.get('code') || '').trim();
-    if (promoCode === "PROMO" || promoCode === "NONE") {
-      promoCode = "";
-    }
-    const bidsParam = (urlParams.get('bids') || '').trim();
-
-    document.getElementById('displayCat').innerText = category || "精選好書";
-    document.getElementById('displayCode').innerText = promoCode ? promoCode : "官方精選";
+    // LIFF 還原網址參數後才讀取。
+    let category = "精選好書";
+    let promoCode = "";
+    let bidsParam = "";
+    const countStatus = document.createElement('div');
+    countStatus.className = 'status-msg';
+    document.getElementById('statusText').after(countStatus);
 
     const shareBtn = document.getElementById('shareBtn');
     const statusText = document.getElementById('statusText');
 
     let flexMessagePayload = null;
+    let countCompletion = Promise.resolve();
 
     liff.init({ liffId: LIFF_ID })
       .then(async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        category = (urlParams.get('cat') || '精選好書').replace(/[🔥⏳📚\s]/g, '').trim();
+        promoCode = (urlParams.get('code') || '').trim();
+        if (["PROMO", "NONE", "DEFAULT"].includes(promoCode.toUpperCase())) promoCode = "";
+        bidsParam = (urlParams.get('bids') || '').trim();
+        document.getElementById('displayCat').innerText = category || "精選好書";
+        document.getElementById('displayCode').innerText = promoCode || "官方精選";
         if (!liff.isLoggedIn()) {
-          liff.login();
+          liff.login({ redirectUri: window.location.href });
           return;
         }
 
-        // 開啟 LIFF 即刻發送計數打點
+        // 記錄開啟分享入口。好友挑選成功/取消均不再加次數。
         triggerShareCountIncrement(promoCode);
 
         if (!liff.isApiAvailable('shareTargetPicker')) {
@@ -155,17 +160,47 @@
         statusText.innerText = "初始化失敗: " + err.message;
       });
 
-    // 穿透 302 轉址與 CORS 的精確打點函式
+    // 透過 callback 確認寫入；逾時不自動重送，避免一次開啟重複加次數。
+    let shareCountRequested = false;
     function triggerShareCountIncrement(code) {
-      if (!GAS_WEBAPP_URL || !code) return;
-      
-      const countUrl = GAS_WEBAPP_URL + 
-        "?action=record_share" + 
-        "&code=" + encodeURIComponent(code) + 
-        "&t=" + new Date().getTime(); // 防止手機快取
-
-      const tracker = new Image();
-      tracker.src = countUrl;
+      if (shareCountRequested) return;
+      shareCountRequested = true;
+      if (!code) {
+        countStatus.innerText = "未帶入推廣碼，本次無法記錄員工分享次數。";
+        return;
+      }
+      let resolveCount;
+      countCompletion = new Promise(resolve => { resolveCount = resolve; });
+      countStatus.innerText = "正在記錄分享次數…";
+      const script = document.createElement('script');
+      const callback = 'shareCount_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+      let settled = false;
+      const finish = (message) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        countStatus.innerText = message;
+        resolveCount();
+        script.remove();
+        // 保留空函式，避免逾時後延遲抵達的 callback 造成例外。
+        window[callback] = () => {};
+      };
+      const timer = setTimeout(() => finish("分享次數確認逾時，請查閱會員清單；本頁不會自動重送。"), 20000);
+      window[callback] = (result) => {
+        const messages = {
+          ok: "本次開啟已記錄，分享次數 +1。",
+          missing_code: "缺少有效推廣碼，未計次。",
+          not_found: "找不到此推廣碼的員工，未計次。",
+          ambiguous_code: "推廣碼對應多位員工，未計次，請聯絡管理員。",
+          busy: "計次服務忙碌，未計次。",
+          error: "計次發生錯誤，請聯絡管理員查看執行紀錄。"
+        };
+        finish(messages[result && result.status] || "計次回應格式不符，請確認部署版本。");
+      };
+      script.onerror = () => finish("無法確認分享計次，請查閱會員清單與 GAS 部署設定。");
+      script.src = GAS_WEBAPP_URL + '?action=open_share&code=' + encodeURIComponent(code)
+        + '&callback=' + callback + '&t=' + Date.now();
+      document.body.appendChild(script);
     }
 
     // 核心資料取得邏輯：優先以 fetch 讀取，成功即組裝 Carousel
@@ -280,8 +315,9 @@
         if (res) {
           // 發送成功
           statusText.innerText = "✅ 已成功分享給好友！";
+          await countCompletion;
           setTimeout(() => {
-            liff.closeWindow();
+            if (liff.isInClient()) liff.closeWindow();
           }, 800);
         } else {
           // 使用者在挑選面板按下「取消」
