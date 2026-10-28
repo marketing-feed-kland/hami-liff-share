@@ -266,25 +266,34 @@
       statusText.innerText = "書單已就緒！點擊按鈕即可挑選好友發送。";
     }
 
-    shareBtn.addEventListener('click', () => {
-      if (!flexMessagePayload) return;
-      shareBtn.disabled = true;
-      statusText.innerText = "開啟挑選面板中...";
+    shareBtn.addEventListener('click', async () => {
+      if (!flexMessagePayload) {
+        alert("書單尚未組裝完成，請稍候再試！");
+        return;
+      }
 
-      liff.shareTargetPicker([flexMessagePayload])
-        .then((res) => {
-          if (res) {
-            statusText.innerText = "✅ 分享成功！即將關閉視窗...";
-            setTimeout(() => { liff.closeWindow(); }, 500);
-          } else {
-            shareBtn.disabled = false;
-            statusText.innerText = "已取消分享";
-          }
-        })
-        .catch((err) => {
+      shareBtn.disabled = true;
+      statusText.innerText = "開啟挑選好友面板中...";
+
+      try {
+        const res = await liff.shareTargetPicker([flexMessagePayload]);
+        if (res) {
+          // 發送成功
+          statusText.innerText = "✅ 已成功分享給好友！";
+          setTimeout(() => {
+            liff.closeWindow();
+          }, 800);
+        } else {
+          // 使用者在挑選面板按下「取消」
           shareBtn.disabled = false;
-          statusText.innerText = "發送未完成：" + err.message;
-        });
+          statusText.innerText = "已取消分享";
+        }
+      } catch (err) {
+        console.error("shareTargetPicker 失敗:", err);
+        shareBtn.disabled = false;
+        statusText.innerText = "發送未完成：" + err.message;
+        alert("發送未完成：" + err.message);
+      }
     });
   </script>
 </body>
