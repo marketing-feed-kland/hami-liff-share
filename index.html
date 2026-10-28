@@ -1,126 +1,19 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <title>好書相報 - 春水小鎮阿財店員</title>
-  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-    body {
-      background-color: #f7f9fa;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .card {
-      background: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-      max-width: 400px;
-      width: 100%;
-      padding: 28px 24px;
-      text-align: center;
-    }
-    .icon {
-      font-size: 54px;
-      margin-bottom: 12px;
-    }
-    h2 {
-      font-size: 20px;
-      color: #2c3e50;
-      margin-bottom: 8px;
-      font-weight: 700;
-    }
-    p {
-      font-size: 14px;
-      color: #666666;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-    .info-box {
-      background-color: #f0f4f8;
-      border-radius: 8px;
-      padding: 14px 16px;
-      margin-bottom: 24px;
-      font-size: 14px;
-      color: #34495e;
-      text-align: left;
-    }
-    .info-item {
-      margin-bottom: 6px;
-    }
-    .info-item:last-child {
-      margin-bottom: 0;
-    }
-    .btn {
-      display: block;
-      width: 100%;
-      background-color: #06c755;
-      color: #ffffff;
-      border: none;
-      border-radius: 10px;
-      padding: 14px 0;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(6, 199, 85, 0.25);
-      transition: background 0.2s, transform 0.1s;
-    }
-    .btn:active {
-      transform: scale(0.98);
-      background-color: #05a847;
-    }
-    .btn:disabled {
-      background-color: #cccccc;
-      box-shadow: none;
-      cursor: not-allowed;
-    }
-    .status-msg {
-      margin-top: 14px;
-      font-size: 13px;
-      color: #888888;
-      min-height: 20px;
-    }
-  </style>
-</head>
-<body>
-
-  <div class="card">
-    <div class="icon">🎁</div>
-    <h2>好書相報轉分享</h2>
-    <p>邀請朋友一起讀好書！點選下方按鈕，挑選 LINE 好友或群組轉發精選書單。</p>
-
-    <div class="info-box">
-      <div class="info-item">📚 <strong>分享主題：</strong><span id="displayCat">讀取中...</span></div>
-      <div class="info-item">🏷️ <strong>專屬推薦碼：</strong><span id="displayCode">讀取中...</span></div>
-    </div>
-
-    <button id="shareBtn" class="btn" disabled>初始化中...</button>
-    <div id="statusText" class="status-msg">正在載入 LINE 環境...</div>
-  </div>
-
-  <script>
+<script>
     const LIFF_ID = "2012185997-sJenhi1M"; 
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwxfWy9bduDRmCTe7x2LoNxb1wRgGC5BpeGU1ncOxz9wQcq64U3-IoquO-1acbRb5M_/exec";
 
     const urlParams = new URLSearchParams(window.location.search);
-    const category = (urlParams.get('cat') || '精選特惠').replace(/[🔥⏳📚]/g, '').trim();
+    let category = (urlParams.get('cat') || '精選好書').replace(/[🔥⏳📚]/g, '').trim();
     const promoCode = (urlParams.get('code') || '').trim();
     const bidsParam = (urlParams.get('bids') || '').trim();
 
-    // 介面渲染（純主題與推薦碼，不帶 uid）
-    document.getElementById('displayCat').innerText = category || "精選好書";
+    // 防呆：若 cat 不小心傳入 U 開頭的 33 碼 LINE User ID，強制轉回精選好書
+    if (category.startsWith("U") && category.length === 33) {
+      category = "精選好書";
+    }
+
+    // 介面渲染：只呈現乾淨主題與推廣碼
+    document.getElementById('displayCat').innerText = category;
     document.getElementById('displayCode').innerText = promoCode ? promoCode : "官方精選";
 
     const shareBtn = document.getElementById('shareBtn');
@@ -135,8 +28,15 @@
           return;
         }
 
-        // 核心：開啟 LIFF 瞬間立即向後端記錄分享次數 +1（以 promoCode 即可定位會員）
-        triggerShareCountIncrement(promoCode);
+        // 從 LINE 環境靜默抓取目前使用者的 userId（不顯示在畫面上）
+        let currentUid = "";
+        try {
+          const profile = await liff.getProfile();
+          currentUid = profile.userId || "";
+        } catch (e) {}
+
+        // 雙保險打點：有 uid 帶 uid，有 code 帶 code，保證後端 100% 成功 +1
+        triggerShareCountIncrement(promoCode, currentUid);
 
         if (!liff.isApiAvailable('shareTargetPicker')) {
           statusText.innerText = "目前環境未開放好友挑選功能";
@@ -146,16 +46,17 @@
         shareBtn.innerText = "正在組裝精選書單...";
         statusText.innerText = "同步推薦書籍中...";
 
-        // 使用 JSONP 取得後端包含尾卡的完整 Carousel
-        loadCarouselViaJSONP();
+        // 載入輪播書單
+        loadCarouselViaJSONP(currentUid);
       })
       .catch((err) => {
         statusText.innerText = "初始化失敗: " + err.message;
       });
 
-    function triggerShareCountIncrement(code) {
-      if (!GAS_WEBAPP_URL || !code) return;
-      const countUrl = `${GAS_WEBAPP_URL}?action=record_share&code=${encodeURIComponent(code)}`;
+    // 背景非同步打點累加次數
+    function triggerShareCountIncrement(code, uid) {
+      if (!GAS_WEBAPP_URL) return;
+      const countUrl = `${GAS_WEBAPP_URL}?action=record_share&code=${encodeURIComponent(code)}&userId=${encodeURIComponent(uid)}`;
       if (navigator.sendBeacon) {
         navigator.sendBeacon(countUrl);
       } else {
@@ -164,7 +65,7 @@
       }
     }
 
-    // JSONP 回呼處理函式
+    // JSONP 回呼
     window.handleBookCarouselResponse = function(response) {
       if (response && response.status === "success" && response.data) {
         flexMessagePayload = response.data;
@@ -176,16 +77,16 @@
       }
     };
 
-    function loadCarouselViaJSONP() {
+    function loadCarouselViaJSONP(uid) {
       if (!GAS_WEBAPP_URL || !bidsParam) {
         fallbackToSingleCard();
         return;
       }
 
       const script = document.createElement('script');
-      script.src = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&bids=${encodeURIComponent(bidsParam)}&callback=handleBookCarouselResponse`;
+      script.src = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&userId=${encodeURIComponent(uid)}&bids=${encodeURIComponent(bidsParam)}&callback=handleBookCarouselResponse`;
       script.onerror = function() {
-        console.warn("JSONP 請求失敗，改用備用卡片");
+        console.warn("JSONP 載入失敗，使用備用卡片");
         fallbackToSingleCard();
       };
       document.body.appendChild(script);
@@ -245,7 +146,6 @@
       statusText.innerText = "書單已就緒！點擊按鈕即可挑選好友發送。";
     }
 
-    // 點擊挑選好友發送
     shareBtn.addEventListener('click', () => {
       if (!flexMessagePayload) return;
       shareBtn.disabled = true;
@@ -267,5 +167,3 @@
         });
     });
   </script>
-</body>
-</html>
