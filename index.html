@@ -122,7 +122,6 @@
     }
     const bidsParam = (urlParams.get('bids') || '').trim();
 
-    // 介面渲染：呈現中文主題與推廣碼，無任何 uid
     document.getElementById('displayCat').innerText = category || "精選好書";
     document.getElementById('displayCode').innerText = promoCode ? promoCode : "官方精選";
 
@@ -138,7 +137,7 @@
           return;
         }
 
-        // 開啟 LIFF 瞬間立即向後端記錄分享次數 +1（以 promoCode 定位會員）
+        // 開啟 LIFF 即刻發送計數打點
         triggerShareCountIncrement(promoCode);
 
         if (!liff.isApiAvailable('shareTargetPicker')) {
@@ -149,8 +148,8 @@
         shareBtn.innerText = "正在組裝精選書單...";
         statusText.innerText = "同步推薦書籍中...";
 
-        // 載入輪播書單（JSONP 跨域安全載入）
-        loadCarouselViaJSONP();
+        // 載入輪播書單
+        fetchCarouselData();
       })
       .catch((err) => {
         statusText.innerText = "初始化失敗: " + err.message;
@@ -167,31 +166,48 @@
       }
     }
 
-    // JSONP 回呼處理函式
+    // 核心資料取得邏輯：優先以 fetch 讀取，成功即組裝 Carousel
+    function fetchCarouselData() {
+      const apiUrl = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&bids=${encodeURIComponent(bidsParam)}`;
+
+      fetch(apiUrl)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData && resData.status === "success" && resData.data) {
+            applyCarouselPayload(resData.data);
+          } else {
+            loadCarouselViaJSONP();
+          }
+        })
+        .catch(() => {
+          loadCarouselViaJSONP();
+        });
+    }
+
+    // JSONP 備援處理
     window.handleBookCarouselResponse = function(response) {
       if (response && response.status === "success" && response.data) {
-        flexMessagePayload = response.data;
-        shareBtn.disabled = false;
-        shareBtn.innerText = "挑選好友立即分享";
-        statusText.innerText = "書單已就緒！點擊按鈕即可挑選好友發送。";
+        applyCarouselPayload(response.data);
       } else {
         fallbackToSingleCard();
       }
     };
 
     function loadCarouselViaJSONP() {
-      if (!GAS_WEBAPP_URL || !bidsParam) {
-        fallbackToSingleCard();
-        return;
-      }
-
       const script = document.createElement('script');
       script.src = `${GAS_WEBAPP_URL}?cat=${encodeURIComponent(category)}&code=${encodeURIComponent(promoCode)}&bids=${encodeURIComponent(bidsParam)}&callback=handleBookCarouselResponse`;
       script.onerror = function() {
-        console.warn("JSONP 請求失敗，改用備用卡片");
+        console.warn("載入失敗，使用備用卡片");
         fallbackToSingleCard();
       };
       document.body.appendChild(script);
+    }
+
+    function applyCarouselPayload(payload) {
+      flexMessagePayload = payload;
+      shareBtn.disabled = false;
+      shareBtn.innerText = "挑選好友立即分享";
+      statusText.innerText = "書單已就緒！點擊按鈕即可挑選好友發送。";
     }
 
     function fallbackToSingleCard() {
@@ -248,7 +264,6 @@
       statusText.innerText = "書單已就緒！點擊按鈕即可挑選好友發送。";
     }
 
-    // 點擊挑選好友發送
     shareBtn.addEventListener('click', () => {
       if (!flexMessagePayload) return;
       shareBtn.disabled = true;
